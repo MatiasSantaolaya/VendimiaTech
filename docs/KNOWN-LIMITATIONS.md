@@ -1,15 +1,15 @@
 # Known limitations
 
-Verified against the tree on 2026-10-06 after `npm test`, `npm run build`, and `npm run test:e2e`. Items below are not done.
+Verified on 2026-10-06. Executed here: `npm run lint` passed, `npm run typecheck` passed, `npm test` passed (8 files, 21 tests), and `npm run test:e2e` passed (3 tests). Items below that are still open were not run.
 
 ## Data plane
 
 - With `DATABASE_URL` set and no `plane_demo` cookie, pages and `/api/*` use Prisma. `/demo` and `plane_demo=1` stay on the memory store. Password login sets `plane_demo` only when there is no database.
-- `getEventAccess`, `calculateEventHealth`, `refreshEventHealth`, `audit`, `getCurrentAttendee`, and `signInWithMagicToken` run on that Prisma path. `getManagerEvent` in `event-by-slug.ts` is still unused, because it refuses every role except management and would block staff and portal pages.
-- `prisma/seed-demo.ts` upserts identity, events, tasks, incidents, sponsors, finance, tickets, program sessions, vendors, speakers, run-of-show rows, attendees, and the demo magic-link session. A second run keeps those fixture rows. It does not insert shifts or polls.
-- `prisma/migrations/20261006153000_init` is the full schema SQL from `prisma migrate diff --from-empty --to-schema-datamodel` (987 lines). It was applied on this machine to PostgreSQL 16.15, database `plane`, with `npx prisma migrate deploy`. There is no `20261006_product_completion` migration. docker-compose was not used to start Postgres; `pg_ctlcluster 16 main start` was.
-- The Docker image outcome is in `docs/DEPLOYMENT.md`. `vercel --prod` was not run. No Vercel project is linked.
-- One database request was exercised: login without `plane_demo=1`, create task `tas_16ee932ae2b1fac5` (`Tarea postgres`), and read it back with Prisma (`audit` action `task.create`, actor `usr_ana`). The rest of the module API was not replayed against Postgres.
+- Local PostgreSQL 16.15, database `plane`, has `20261006153000_init` applied. Login of `ana.organizer@vendimiatech.demo` returned `demo: false` and cleared `plane_demo`. `POST /api/events/evt_vendimia/modules` created task `tas_16ee932ae2b1fac5` (`Tarea postgres`). Prisma read it back with audit action `task.create` and actor `usr_ana`. The rest of the module API was not replayed against Postgres.
+- `npm run db:seed:demo` twice printed `tasks=12 incidents=3 sponsors=3 expenses=4 tickets=135 sessions=3 vendors=2 speakers=3 runOfShow=3`. The seed does not insert shifts or polls. `npm run db:seed` was not run.
+- `plane-event-os:latest` (`fadce627b2a9`) was started with host networking and `DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:5432/plane`. `GET /api/health` returned `{"ok":true,"service":"plane","mode":"database","demoReady":true}`. The container was stopped and removed. The image remains.
+- Vercel deploy is not done. `vercel --prod` was not run. No Vercel project is linked.
+- `getManagerEvent` in `event-by-slug.ts` is still unused, because it refuses every role except management and would block staff and portal pages.
 
 ## Product depth
 
@@ -28,7 +28,7 @@ Verified against the tree on 2026-10-06 after `npm test`, `npm run build`, and `
 
 ## Abra
 
-The four relative paths in `lib/ticketing/abra.ts` are the uploaded contract, not a confirmed Abra API. See `docs/INTEGRATIONS.md`.
+Abra is not done. The four relative paths in `lib/ticketing/abra.ts` are the uploaded contract. They were not confirmed, and no endpoints were added. See `docs/INTEGRATIONS.md`.
 
 ## Dependency pins
 
