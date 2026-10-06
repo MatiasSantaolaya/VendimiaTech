@@ -1,11 +1,15 @@
 FROM node:22-alpine AS deps
 WORKDIR /app
 COPY package.json package-lock.json ./
+COPY scripts/postinstall.mjs ./scripts/postinstall.mjs
 RUN npm install --omit=dev
 
 FROM node:22-alpine AS builder
 WORKDIR /app
+ENV DATABASE_URL="postgresql://postgres:postgres@127.0.0.1:5432/plane"
 COPY package.json package-lock.json ./
+COPY scripts/postinstall.mjs ./scripts/postinstall.mjs
+COPY prisma ./prisma
 RUN npm install
 COPY . .
 RUN npx prisma generate
