@@ -6,11 +6,10 @@ Verified against the tree on 2026-10-06 after `npm test`, `npm run build`, and `
 
 - With `DATABASE_URL` set and no `plane_demo` cookie, pages and `/api/*` use Prisma. `/demo` and `plane_demo=1` stay on the memory store. Password login sets `plane_demo` only when there is no database.
 - `getEventAccess`, `calculateEventHealth`, `refreshEventHealth`, `audit`, `getCurrentAttendee`, and `signInWithMagicToken` run on that Prisma path. `getManagerEvent` in `event-by-slug.ts` is still unused, because it refuses every role except management and would block staff and portal pages.
-- `prisma/seed-demo.ts` upserts organizations, users, memberships, and events only. It does not insert tasks, tickets, sponsors, sessions, or incidents.
-- `prisma/migrations/20261006153000_init` is the full schema SQL from `prisma migrate diff --from-empty --to-schema-datamodel` (987 lines). It replaces the earlier init file, which had the same SQL. It was not applied: `docker` is not installed (`docker: command not found`), so docker-compose Postgres was not started. There is no `20261006_product_completion` migration.
-- `docker build` was not run. The command failed with `docker: command not found` (exit 127). The Dockerfile now installs devDependencies in the builder so `npx prisma generate` can run, and copies the generated client into the `--omit=dev` runner. That image has not been built here.
-- Vercel production was not deployed. No Vercel project is linked.
-- The Prisma path was typechecked. It was not exercised against a live database.
+- `prisma/seed-demo.ts` upserts organizations, users, memberships, events, budget categories, sponsor deals, deliverables, tasks, incidents, expenses, revenues, invoices, and payments. It does not insert tickets, program sessions, vendors, speakers, or run-of-show rows. A second run keeps the same fixture rows.
+- `prisma/migrations/20261006153000_init` is the full schema SQL from `prisma migrate diff --from-empty --to-schema-datamodel` (987 lines). It was applied on this machine to PostgreSQL 16.15, database `plane`, with `npx prisma migrate deploy`. There is no `20261006_product_completion` migration. docker-compose was not used to start Postgres; `pg_ctlcluster 16 main start` was.
+- The Docker image outcome is in `docs/DEPLOYMENT.md`. `vercel --prod` was not run. No Vercel project is linked.
+- One database request was exercised: login without `plane_demo=1`, create task `tas_16ee932ae2b1fac5` (`Tarea postgres`), and read it back with Prisma (`audit` action `task.create`, actor `usr_ana`). The rest of the module API was not replayed against Postgres.
 
 ## Product depth
 

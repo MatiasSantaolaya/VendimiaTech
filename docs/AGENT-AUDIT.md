@@ -115,11 +115,11 @@ Imports decided the directories. Duplicate names were not merged.
 
 ### Schema
 
-The upload names `20261006_product_completion` but does not include a previous baseline schema. This branch adds `prisma/schema.prisma` and `prisma/migrations/20261006153000_init/migration.sql`, generated with `prisma migrate diff --from-empty --to-schema-datamodel`. The SQL was not applied. `docker` is not installed. Agenda rows are `ProgramSession` because the auth model is already named `Session`. `AttendeeSession.id` and `AuditLog.id` use `@default(cuid())` so the uploaded create calls typecheck. Non-demo requests call `getEventAccess`, `calculateEventHealth` / `refreshEventHealth`, `audit`, and the attendee session helpers.
+The upload names `20261006_product_completion` but does not include a previous baseline schema. This branch adds `prisma/schema.prisma` and `prisma/migrations/20261006153000_init/migration.sql`, generated with `prisma migrate diff --from-empty --to-schema-datamodel`. The SQL was applied on this machine to PostgreSQL 16.15, database `plane`. Agenda rows are `ProgramSession` because the auth model is already named `Session`. `AttendeeSession.id` and `AuditLog.id` use `@default(cuid())` so the uploaded create calls typecheck. Non-demo requests call `getEventAccess`, `calculateEventHealth` / `refreshEventHealth`, `audit`, and the attendee session helpers. One such request created task `tas_16ee932ae2b1fac5` and Prisma read it back.
 
 ## Docs pass
 
-An earlier docs commit described missing `app/` routes. That note is obsolete. `START-HERE.md`, `docs/*.md`, the README "This repository" section, and `VERCEL-DEMO.md` now match the running tree: `/demo` exists, tests and `next build` passed, and the Prisma request path is still unwired. Unbuilt behavior stays in `docs/KNOWN-LIMITATIONS.md`.
+An earlier docs commit described missing `app/` routes. That note is obsolete. `START-HERE.md`, `docs/*.md`, the README "This repository" section, and `VERCEL-DEMO.md` now match the running tree: `/demo` exists, tests and `next build` passed, and one Prisma request was run against local Postgres. Unbuilt behavior stays in `docs/KNOWN-LIMITATIONS.md`.
 
 ## Verification (2026-10-06)
 
@@ -128,5 +128,14 @@ An earlier docs commit described missing `app/` routes. That note is obsolete. `
 - `npm test`: 7 files, 19 tests passed.
 - `npm run build`: Next.js 16.3.8 compiled successfully. Routes: `/`, `/login`, `/demo`, `/api/[[...path]]`, `/events/[slug]/[[...module]]`, `/attendee/[eventId]`, `/invite/[token]`.
 - `npm run test:e2e`: 2 passed. Chromium installed. First run failed because `/demo` redirected to `localhost` while Playwright used `127.0.0.1`, so the session cookie was dropped. The redirect now uses the request `Host`.
-- `docker build`: not run.
+- `docker build`: not run in that pass (`docker: command not found`, exit 127).
+- `vercel --prod`: not run.
+
+## Database and Docker pass (2026-10-06)
+
+- PostgreSQL 16.15 started with `sudo pg_ctlcluster 16 main start` after `policy-rc.d` denied the service. Database `plane` at `127.0.0.1:5432`.
+- `npx prisma migrate deploy` applied `20261006153000_init`. `_prisma_migrations` shows that row finished.
+- `npm run db:seed:demo` twice after the API write printed `tasks=12 incidents=3 sponsors=3 expenses=4`. The extra task is `tas_16ee932ae2b1fac5`, created through the API, so the fixture upsert did not remove it.
+- `GET /api/health` returned `"mode":"database"`. Login of `ana.organizer@vendimiatech.demo` returned `"demo":false` and `Set-Cookie: plane_demo=; ... Max-Age=0`. `POST /api/events/evt_vendimia/modules` returned `201` and `{"ok":true,"id":"tas_16ee932ae2b1fac5"}`. Prisma `task.findUnique` returned title `Tarea postgres`, audit action `task.create`, actor `usr_ana`.
+- First Docker build failed: missing `/app/scripts/postinstall.mjs`. Second build, after copying that file, tagged `plane-event-os:latest` (`fadce627b2a9`). The image was not run.
 - `vercel --prod`: not run.

@@ -25,7 +25,7 @@ Open `http://localhost:3000/demo`. That route signs in Ana Organizer on Vendimia
 | `npm run build` | Passed. Next.js 16.3.8, compiled successfully. |
 | `npm run test:e2e` | 3 Playwright tests passed on the later pass (login, demo flows, cross-tenant). |
 
-`docker build -t plane-event-os /workspace` failed with `docker: command not found` (exit 127). `vercel --prod` was not run. The init migration was not applied to Postgres.
+PostgreSQL 16.15 is running on this machine at `127.0.0.1:5432`. `npx prisma migrate deploy` applied `20261006153000_init`. `npm run db:seed:demo` upserts organizations, users, memberships, events, tasks, incidents, sponsors, and finance rows. A database login of `ana.organizer@vendimiatech.demo` returned `demo: false` and cleared `plane_demo` (`Max-Age=0`). `POST /api/events/evt_vendimia/modules` created task `tas_16ee932ae2b1fac5`, and Prisma read that row back. `vercel --prod` was not run. The Docker image build is recorded in `docs/DEPLOYMENT.md`.
 
 ## Read next
 

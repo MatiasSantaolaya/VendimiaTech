@@ -12,21 +12,21 @@ Status after the 2026-10-06 verification on branch `feat/plane-event-os`. Checke
 - [x] Health, finance, graph blockers, matchmaking, and forecast have unit tests.
 - [x] Playwright covers command center, task complete, incident resolve, five portals, ticketing probe, analytics, brain ticket count, and finance denial.
 - [x] `npm run typecheck`, `npm run lint`, `npm test`, and `npm run build` passed.
-- [x] Initial SQL migration file exists (`20261006000000_init`).
+- [x] Initial SQL migration file exists (`20261006153000_init`) and was applied to local PostgreSQL 16.
 - [x] `.env.example` lists variables. No live secrets are committed.
 - [x] Security headers and a CSP that allows the Abra checkout host.
 - [x] Abra sync fails closed when credentials are absent.
 
 ## Still required before production
 
-- [x] Route pages and `handleApi` through Prisma when `DATABASE_URL` is set and `plane_demo` is not set. Password login does not set `plane_demo=1` in that case. Not run against a live database.
-- [ ] Apply `prisma/migrations/20261006153000_init` to Postgres and run `npm run db:seed` with a non-demo owner. Docker was not available, so this was not applied.
-- [ ] Extend `db:seed:demo` if a Postgres demo must contain the full graph. Today only identity rows are upserted.
+- [x] Route pages and `handleApi` through Prisma when `DATABASE_URL` is set and `plane_demo` is not set. Password login does not set `plane_demo=1`. Verified against local Postgres: login returned `demo: false`, and task `tas_16ee932ae2b1fac5` was created and read back.
+- [x] Apply `prisma/migrations/20261006153000_init` to local Postgres. `npm run db:seed` (the non-demo owner seed) was not run.
+- [x] `db:seed:demo` upserts tasks, incidents, sponsors, and finance rows as well as identity and events. Tickets, program sessions, vendors, speakers, and run-of-show rows are still absent.
 - [ ] Confirm Abra's real paths, auth, and webhook shape. See `docs/INTEGRATIONS.md`.
 - [ ] Set `WORKER_SECRET` and run the worker against the same data store the API uses. Today the worker drains memory jobs only.
 - [ ] Move rate limiting off process memory (Upstash adapter exists, unused by default).
 - [ ] Decide a storage provider. There is no local fallback.
-- [ ] Build and run the Docker image. `docker build` failed here with `docker: command not found`. The Dockerfile was changed so the builder installs devDependencies before `npx prisma generate`.
+- [x] Build the Docker image. `DOCKER_HOST=tcp://127.0.0.1:2375 docker build -t plane-event-os /workspace` succeeded (`plane-event-os:latest`, id `fadce627b2a9`). The container was not started. The unix socket was absent; `service docker start` is not available.
 - [ ] Create the Vercel project, set env vars, and deploy a preview. `vercel --prod` was not run and should wait until the database path is real.
 - [ ] Review the service worker so it does not cache authenticated HTML in production.
 - [ ] Replace fixture dates, venue, and sponsor names before any public Vendimia Tech launch. They are demo data.

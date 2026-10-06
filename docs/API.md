@@ -9,7 +9,7 @@ Demo requests (no `DATABASE_URL`, or cookie `plane_demo=1`) read and write the i
 | Method | Path | Behavior |
 | --- | --- | --- |
 | GET | `/api/health` | `{ ok, service: "plane", mode, demoReady: true }`. `mode` is `database-or-demo` when `DATABASE_URL` is set, otherwise `demo`. The mode string does not switch the data source. |
-| POST | `/api/auth/login` | Body `{ email, password }`. Sets session, CSRF, and `plane_demo=1`. 401 on bad credentials, 429 after 5 failures. |
+| POST | `/api/auth/login` | Body `{ email, password }`. Sets session and CSRF. Sets `plane_demo=1` only when `DATABASE_URL` is unset. A database login clears `plane_demo`. 401 on bad credentials, 429 after 5 failures. |
 | POST | `/api/auth/logout` | Revokes the session cookie. |
 | GET | `/api/auth/session` | Current user or 401. |
 | POST | `/api/auth/invitations/accept` | Body `{ token, name, password }`. Demo token: `demo-invite-token`. |
