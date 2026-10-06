@@ -32,8 +32,8 @@ Login records failures per `email|ip`. Five failures in 15 minutes return 429. T
 
 ## What is not production-hardened yet
 
-- Event APIs ignore Prisma and share one in-memory graph for the process. That is acceptable for `/demo` and unsafe as a multi-tenant production database.
-- Login always sets `plane_demo=1`, including when `DATABASE_URL` is present.
+- Demo mode (`/demo` or `plane_demo=1`) shares one in-memory graph per process. A database session does not.
+- Login sets `plane_demo=1` only when `DATABASE_URL` is unset. A database login clears that cookie.
 - There is no storage adapter that writes to disk, and uploaded files are not implemented in the UI.
 - Webhook signature comparison uses `timingSafeEqual` after a length check. Abra verification returns false when `ABRA_WEBHOOK_SECRET` is empty.
 - Service worker caches GET responses, including HTML. That can serve a stale demo page after a deploy. Playwright blocks service workers; a browser does not.

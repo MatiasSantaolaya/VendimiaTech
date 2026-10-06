@@ -4,13 +4,13 @@ Verified against the tree on 2026-10-06 after `npm test`, `npm run build`, and `
 
 ## Data plane
 
-- Pages and `/api/*` always use the memory demo store. `DATABASE_URL` does not switch reads or writes to Prisma.
-- Login and invitation accept always set `plane_demo=1`.
-- `lib/services/event-access.ts`, `event-by-slug.ts`, `event-health.ts`, `audit.ts`, and `attendee-auth.ts` are the uploaded Prisma helpers. The UI does not call them.
+- With `DATABASE_URL` set and no `plane_demo` cookie, pages and `/api/*` use Prisma. `/demo` and `plane_demo=1` stay on the memory store. Password login sets `plane_demo` only when there is no database.
+- `getEventAccess`, `calculateEventHealth`, `refreshEventHealth`, `audit`, `getCurrentAttendee`, and `signInWithMagicToken` run on that Prisma path. `getManagerEvent` in `event-by-slug.ts` is still unused, because it refuses every role except management and would block staff and portal pages.
 - `prisma/seed-demo.ts` upserts organizations, users, memberships, and events only. It does not insert tasks, tickets, sponsors, sessions, or incidents.
-- `prisma/migrations/20261006000000_init` was generated from an empty database. It was not applied to Postgres. There is no `20261006_product_completion` migration.
-- Docker image build was not run. `npm install --omit=dev` in the Dockerfile may omit the Prisma CLI and TypeScript that the builder stage needs.
+- `prisma/migrations/20261006153000_init` is the full schema SQL from `prisma migrate diff --from-empty --to-schema-datamodel` (987 lines). It replaces the earlier init file, which had the same SQL. It was not applied: `docker` is not installed (`docker: command not found`), so docker-compose Postgres was not started. There is no `20261006_product_completion` migration.
+- `docker build` was not run. The command failed with `docker: command not found` (exit 127). The Dockerfile now installs devDependencies in the builder so `npx prisma generate` can run, and copies the generated client into the `--omit=dev` runner. That image has not been built here.
 - Vercel production was not deployed. No Vercel project is linked.
+- The Prisma path was typechecked. It was not exercised against a live database.
 
 ## Product depth
 

@@ -19,14 +19,14 @@ Status after the 2026-10-06 verification on branch `feat/plane-event-os`. Checke
 
 ## Still required before production
 
-- [ ] Route pages and `handleApi` through Prisma when `plane_demo` is not set, and stop forcing `plane_demo=1` on password login.
-- [ ] Apply `20261006000000_init` to a real Postgres and run `npm run db:seed` with a non-demo owner.
+- [x] Route pages and `handleApi` through Prisma when `DATABASE_URL` is set and `plane_demo` is not set. Password login does not set `plane_demo=1` in that case. Not run against a live database.
+- [ ] Apply `prisma/migrations/20261006153000_init` to Postgres and run `npm run db:seed` with a non-demo owner. Docker was not available, so this was not applied.
 - [ ] Extend `db:seed:demo` if a Postgres demo must contain the full graph. Today only identity rows are upserted.
 - [ ] Confirm Abra's real paths, auth, and webhook shape. See `docs/INTEGRATIONS.md`.
 - [ ] Set `WORKER_SECRET` and run the worker against the same data store the API uses. Today the worker drains memory jobs only.
 - [ ] Move rate limiting off process memory (Upstash adapter exists, unused by default).
 - [ ] Decide a storage provider. There is no local fallback.
-- [ ] Build and run the Docker image. Not executed.
+- [ ] Build and run the Docker image. `docker build` failed here with `docker: command not found`. The Dockerfile was changed so the builder installs devDependencies before `npx prisma generate`.
 - [ ] Create the Vercel project, set env vars, and deploy a preview. `vercel --prod` was not run and should wait until the database path is real.
 - [ ] Review the service worker so it does not cache authenticated HTML in production.
 - [ ] Replace fixture dates, venue, and sponsor names before any public Vendimia Tech launch. They are demo data.

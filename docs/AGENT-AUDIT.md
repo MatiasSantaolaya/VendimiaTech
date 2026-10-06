@@ -115,7 +115,7 @@ Imports decided the directories. Duplicate names were not merged.
 
 ### Schema
 
-The upload names `20261006_product_completion` but does not include a previous baseline schema. This branch adds `prisma/schema.prisma` and `prisma/migrations/20261006000000_init/migration.sql`, generated with `prisma migrate diff --from-empty`. The SQL was not applied to a database. Agenda rows are `ProgramSession` because the auth model is already named `Session`. `AttendeeSession.id` and `AuditLog.id` use `@default(cuid())` so the uploaded create calls typecheck.
+The upload names `20261006_product_completion` but does not include a previous baseline schema. This branch adds `prisma/schema.prisma` and `prisma/migrations/20261006153000_init/migration.sql`, generated with `prisma migrate diff --from-empty --to-schema-datamodel`. The SQL was not applied. `docker` is not installed. Agenda rows are `ProgramSession` because the auth model is already named `Session`. `AttendeeSession.id` and `AuditLog.id` use `@default(cuid())` so the uploaded create calls typecheck. Non-demo requests call `getEventAccess`, `calculateEventHealth` / `refreshEventHealth`, `audit`, and the attendee session helpers.
 
 ## Docs pass
 

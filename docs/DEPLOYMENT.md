@@ -43,7 +43,7 @@ npx prisma generate
 npx prisma migrate deploy
 ```
 
-The only migration in the tree is `prisma/migrations/20261006000000_init`. It was generated with `prisma migrate diff --from-empty --to-schema-datamodel` and was not applied to a running Postgres in this session. The README name `20261006_product_completion` is an upstream instruction. That migration file is not in this checkout.
+The only migration in the tree is `prisma/migrations/20261006153000_init`. It was generated with `prisma migrate diff --from-empty --to-schema-datamodel prisma/schema.prisma --script` and was not applied. `docker` is not on this machine (`docker: command not found`), so `docker compose` Postgres was not started. The README name `20261006_product_completion` is an upstream instruction. That migration file is not in this checkout.
 
 `npm run db:seed` upserts one owner when the `SEED_*` variables are set. Otherwise it prints a no-op. It does not load Vendimia Tech.
 
@@ -51,7 +51,7 @@ The only migration in the tree is `prisma/migrations/20261006000000_init`. It wa
 
 ## Docker
 
-`docker-compose.yml` starts Postgres 17 and the app. `Dockerfile` uses `node:22-alpine`, installs production dependencies with `--omit=dev`, then generates the client and runs `npm run build` in the builder stage. This image was not built here. Because `typescript` and `prisma` are devDependencies, `npm install --omit=dev` can skip the CLI the builder later expects. Treat a green `docker build` as unverified.
+`docker-compose.yml` starts Postgres 17 and the app. `Dockerfile` keeps `npm install --omit=dev` for the runner. The builder stage runs a full `npm install` so `prisma` and `typescript` exist, then `npx prisma generate` and `npm run build`. The generated `.prisma` client is copied into the runner. `docker build -t plane-event-os /workspace` was attempted and failed before any image step: `docker: command not found` (exit 127).
 
 ## Vercel
 

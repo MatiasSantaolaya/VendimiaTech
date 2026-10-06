@@ -2,7 +2,7 @@
 
 All routes are handled by `app/api/[[...path]]/route.ts`. Responses are JSON unless noted. Errors look like `{ "error": { "code": "...", "message": "..." } }`.
 
-These handlers read and write the in-memory demo store. They do not query Prisma.
+Demo requests (no `DATABASE_URL`, or cookie `plane_demo=1`) read and write the in-memory store. Any other request uses Prisma. `POST /api/auth/login` with `DATABASE_URL` set does not set `plane_demo`. `POST /api/auth/attendee` calls `signInWithMagicToken` on that database path.
 
 ## Public
 

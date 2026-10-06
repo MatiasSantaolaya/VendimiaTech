@@ -21,11 +21,11 @@ Open `http://localhost:3000/demo`. That route signs in Ana Organizer on Vendimia
 | `npx prisma generate` | Completed with `DATABASE_URL` set to the example local URL. |
 | `npm run typecheck` | Passed after the pin and the type fixes in this branch. |
 | `npm run lint` | Passed with 0 errors. Next.js 16.3.8 removed `next lint`, so the script runs `eslint .`. |
-| `npm test` | 7 files, 19 tests, passed. |
+| `npm test` | Later pass: 8 files, 21 tests, passed. |
 | `npm run build` | Passed. Next.js 16.3.8, compiled successfully. |
-| `npm run test:e2e` | 2 Playwright tests passed (Chromium). |
+| `npm run test:e2e` | 3 Playwright tests passed on the later pass (login, demo flows, cross-tenant). |
 
-`docker build` and `vercel --prod` were not run.
+`docker build -t plane-event-os /workspace` failed with `docker: command not found` (exit 127). `vercel --prod` was not run. The init migration was not applied to Postgres.
 
 ## Read next
 

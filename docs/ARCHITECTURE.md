@@ -6,8 +6,8 @@ PlanE is a Next.js App Router application. Code lives at the repository root (`a
 
 | Path | Status |
 | --- | --- |
-| Demo memory store (`lib/demo/store.ts`, `globalThis.planeDemo`) | Used by every page and by `handleApi`. `/demo` sets `plane_demo=1` and a session cookie. |
-| PostgreSQL via Prisma (`prisma/schema.prisma`, `lib/prisma.ts`, `lib/services/*`) | Schema, client, and an initial migration exist. Uploaded services (`event-access`, `event-health`, `audit`, `attendee-auth`, `event-by-slug`) query Prisma. The App Router and `lib/server/api.ts` do not call them. A request with `DATABASE_URL` set still reads and writes the memory store, and login still sets `plane_demo=1`. |
+| Demo memory store (`lib/demo/store.ts`, `globalThis.planeDemo`) | Used when `DATABASE_URL` is unset, or when the request has `plane_demo=1`. `/demo` sets that cookie and does not open Postgres. |
+| PostgreSQL via Prisma | Used when `DATABASE_URL` is set and `plane_demo` is absent. Login does not set `plane_demo`. Pages call `getEventAccess`, `calculateEventHealth`, and `getCurrentAttendee`. Writes call `audit` and `refreshEventHealth`. |
 
 Domain rules (health, finance, graph, matchmaking, forecast, RBAC, brain) are pure functions in `lib/domain`. The demo view (`lib/server/view.ts`) calls those functions on the memory fixture. `lib/services/event-health.ts` is the uploaded Prisma query and is not invoked by the UI.
 
