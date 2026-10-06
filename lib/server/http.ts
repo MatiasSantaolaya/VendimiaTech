@@ -20,12 +20,21 @@ export function readCookie(request: Request, name: string) {
   return null;
 }
 
-export function cookieHeader(name: string, value: string, request: Request, httpOnly: boolean) {
+export function cookieHeader(name: string, value: string, request: Request, httpOnly: boolean, maxAge = 60 * 60 * 24 * 14) {
   const secure = process.env.NODE_ENV === "production" && new URL(request.url).protocol === "https:";
-  const parts = [`${name}=${encodeURIComponent(value)}`, "Path=/", "SameSite=Lax", `Max-Age=${60 * 60 * 24 * 14}`];
+  const parts = [`${name}=${encodeURIComponent(value)}`, "Path=/", "SameSite=Lax", `Max-Age=${maxAge}`];
   if (httpOnly) parts.push("HttpOnly");
   if (secure) parts.push("Secure");
   return parts.join("; ");
+}
+
+export function authCookieList(request: Request, token: string, csrf: string, demo: boolean) {
+  const cookies = [
+    cookieHeader("plane_session", token, request, true),
+    cookieHeader("plane_csrf", csrf, request, false),
+  ];
+  cookies.push(demo ? cookieHeader("plane_demo", "1", request, true) : cookieHeader("plane_demo", "", request, true, 0));
+  return cookies;
 }
 
 export function withCookies(response: Response, cookies: string[]) {

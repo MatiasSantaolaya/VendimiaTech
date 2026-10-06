@@ -9,7 +9,9 @@ import { abraTickets } from "@/lib/ticketing/abra";
 import { verifyMockSignature } from "@/lib/ticketing/mock";
 import { createMonitoring } from "@/lib/monitoring";
 import { createRateLimiter } from "@/lib/rate-limit";
-import { assertSameOrigin, clientIp, cookieHeader, HttpError, json, readCookie, withCookies } from "@/lib/server/http";
+import { databaseAccept, databaseLogin, databaseWebhook, databaseWorker, handleDatabaseApi } from "@/lib/server/database-api";
+import { authCookieList, assertSameOrigin, clientIp, cookieHeader, HttpError, json, readCookie, withCookies } from "@/lib/server/http";
+import { hasDatabase, isDemoMode } from "@/lib/server/mode";
 
 const limiter = createRateLimiter();
 const monitor = createMonitoring();
@@ -33,15 +35,23 @@ export async function handleApi(request: Request) {
     const url = new URL(request.url);
     const parts = url.pathname.replace(/^\/api\/?/, "").split("/").filter(Boolean);
     const method = request.method.toUpperCase();
+    const demo = isDemoMode(readCookie(request, "plane_demo"));
     if (method === "GET" && parts[0] === "health") {
-      return json(200, { ok: true, service: "plane", mode: process.env.DATABASE_URL ? "database-or-demo" : "demo", demoReady: true });
+      return json(200, { ok: true, service: "plane", mode: demo ? "demo" : "database", demoReady: true });
     }
-    if (parts[0] === "ticketing" && parts[1] === "webhook" && method === "POST") return webhook(request);
-    if (parts[0] === "internal" && parts[1] === "worker" && method === "POST") return worker(request);
+    if (parts[0] === "ticketing" && parts[1] === "webhook" && method === "POST") return demo ? webhook(request) : databaseWebhook(request);
+    if (parts[0] === "internal" && parts[1] === "worker" && method === "POST") return demo ? worker(request) : databaseWorker(request);
     if (method !== "GET" && method !== "HEAD") assertSameOrigin(request);
+    if (parts[0] === "auth" && parts[1] === "login" && method === "POST") {
+      if (!hasDatabase()) return login(request, getDemoState(), ip);
+      return databaseLogin(request);
+    }
+    if (parts[0] === "auth" && parts[1] === "invitations" && parts[2] === "accept" && method === "POST") {
+      if (!hasDatabase()) return accept(request, getDemoState());
+      return databaseAccept(request);
+    }
+    if (!demo) return handleDatabaseApi(request, parts, method);
     const state = getDemoState();
-    if (parts[0] === "auth" && parts[1] === "login" && method === "POST") return login(request, state, ip);
-    if (parts[0] === "auth" && parts[1] === "invitations" && parts[2] === "accept" && method === "POST") return accept(request, state);
     const token = readCookie(request, "plane_session");
     const current = actorFromToken(state, token);
     if (parts[0] === "auth" && parts[1] === "logout" && method === "POST") {
@@ -78,11 +88,7 @@ async function login(request: Request, state: ReturnType<typeof getDemoState>, i
   const result = loginDemo(state, body.email, body.password, ip);
   if (!result.ok) return json(result.status, { error: { code: result.status === 429 ? "RATE_LIMIT" : "INVALID_LOGIN", message: result.error } });
   const event = state.events.find((row) => row.organizationId === "org_vendimia") ?? state.events[0];
-  return withCookies(json(200, { ok: true, slug: event?.slug ?? EVENT_SLUG }), [
-    cookieHeader("plane_session", result.token, request, true),
-    cookieHeader("plane_csrf", result.csrfToken, request, false),
-    cookieHeader("plane_demo", "1", request, true),
-  ]);
+  return withCookies(json(200, { ok: true, slug: event?.slug ?? EVENT_SLUG, demo: true }), authCookieList(request, result.token, result.csrfToken, true));
 }
 
 async function accept(request: Request, state: ReturnType<typeof getDemoState>) {
@@ -90,7 +96,7 @@ async function accept(request: Request, state: ReturnType<typeof getDemoState>) 
   const result = acceptInvite(state, body.token, body.name, body.password);
   if ("error" in result && result.error) return json(result.error.status, { error: { code: "INVITE", message: result.error.message } });
   if (!("token" in result)) return json(400, { error: { code: "INVITE", message: "No se pudo aceptar." } });
-  return withCookies(json(200, { ok: true, email: result.email }), [cookieHeader("plane_session", result.token, request, true), cookieHeader("plane_csrf", result.csrfToken, request, false), cookieHeader("plane_demo", "1", request, true)]);
+  return withCookies(json(200, { ok: true, email: result.email, demo: true }), authCookieList(request, result.token, result.csrfToken, true));
 }
 
 function worker(request: Request) {

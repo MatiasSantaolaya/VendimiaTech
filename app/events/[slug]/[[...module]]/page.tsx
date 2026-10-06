@@ -12,22 +12,21 @@ const SECTIONS = ["control-center", "planning", "finance", "commercial", "conten
 export default async function EventPage({ params }: { params: Promise<{ slug: string; module?: string[] }> }) {
   const { slug, module } = await params;
   const section = module?.[0];
-  const { event, view, current, demo } = await loadWorkspace(slug);
-  if (!event) notFound();
+  const { event, view, current, demo, state } = await loadWorkspace(slug);
+  if (!event || !state) notFound();
   if (!section) {
-    const demoState = (await import("@/lib/demo/store")).getDemoState();
-    const speakerName = new Map(demoState.speakers.map((row) => [row.id, row.personName]));
-    const agenda = demoState.sessionsProgram.filter((row) => row.eventId === event.id).map((row) => ({
+    const speakerName = new Map(state.speakers.map((row) => [row.id, row.personName]));
+    const agenda = state.sessionsProgram.filter((row) => row.eventId === event.id).map((row) => ({
       id: row.id,
       title: row.title,
       type: row.type,
       startAt: row.startAt,
-      stage: { name: demoState.stages.find((stage) => stage.id === row.stageId)?.name || "Escenario" },
+      stage: { name: state.stages.find((stage) => stage.id === row.stageId)?.name || "Escenario" },
       speakers: row.speakerIds.map((id) => ({ speaker: { id, personName: speakerName.get(id) || "Orador" } })),
     }));
-    const venue = demoState.venues.find((row) => row.eventId === event.id);
-    const spaces = venue ? demoState.spaces.filter((row) => row.venueId === venue.id) : [];
-    const page = demoState.publicPages.find((row) => row.eventId === event.id);
+    const venue = state.venues.find((row) => row.eventId === event.id);
+    const spaces = venue ? state.spaces.filter((row) => row.venueId === venue.id) : [];
+    const page = state.publicPages.find((row) => row.eventId === event.id);
     return <PublicEventView event={{ ...event, venue: venue ? { ...venue, spaces } : null }} page={page} agenda={agenda} stages={[{ id: "stg", name: "Escenario" }]} checkoutEvent={event.abraCheckoutEvent || undefined} />;
   }
   if (!SECTIONS.includes(section as (typeof SECTIONS)[number])) notFound();
