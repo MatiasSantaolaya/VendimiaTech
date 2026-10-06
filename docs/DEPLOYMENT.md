@@ -1,64 +1,62 @@
 # Deployment
 
-No deployment has been run from this checkout. `vercel --prod` has not been executed.
+Target: Vercel, Next.js, PostgreSQL. Do not run `vercel --prod` from this branch until the Prisma request path exists. It was not run here.
 
-## Vercel
+## Versions resolved on 2026-10-06
 
-`vercel.json`:
+| Package | Resolved |
+| --- | --- |
+| next | 16.3.8 |
+| prisma / @prisma/client | 6.19.3 (pinned). `latest` was Prisma 8.0.0-rc.20, whose CLI has no `generate` or `migrate`. |
+| Node on this machine | v22.14.0 |
 
-- `framework`: `nextjs`
-- `buildCommand`: `next build`
-- `installCommand`: `npm install --no-audit --no-fund`
+`package.json` `build` remains `next build`. `postinstall` runs `scripts/postinstall.mjs`, which calls `prisma generate` and warns instead of failing if generate cannot run (the Docker deps stage uses `--omit=dev`, and the Prisma CLI is a devDependency).
 
-`scripts/postinstall.mjs` tries `prisma generate` and warns if the CLI is missing. Vercel’s install includes devDependencies, so generate can run there. The build command itself is `next build`, not `npm run build`, so it does not run npm’s `prebuild` hook. There is no Next.js `app/` or `pages/` directory, so `next build` cannot succeed until routes exist.
+`vercel.json` is unchanged: framework `nextjs`, `buildCommand` `next build`, `installCommand` `npm install --no-audit --no-fund`.
 
-`VERCEL-DEMO.md` says `/demo` needs no Postgres. That route is not implemented.
+## Environment
 
-## Docker
+Copy `.env.example`. No real secrets belong in git.
 
-`Dockerfile` (unchanged from the upload):
+Required for a database-backed process (the UI still uses memory today):
 
-1. `npm install --omit=dev` in the deps stage.
-2. Builder copies those `node_modules`, then `npx prisma generate` and `npm run build`.
-3. Runner starts `npm start` and copies `.next`, `public`, and `prisma`.
+- `DATABASE_URL` — example `postgresql://postgres:postgres@localhost:5432/plane`
 
-`typescript` and `prisma` are devDependencies. The deps stage omits them. `postinstall` catches a failed `prisma generate` so the deps stage can finish; the builder then relies on `npx prisma generate`. `next build` also needs TypeScript when `tsconfig.json` is present. That combination has not been executed here. Do not treat the image as buildable until `docker build` is run.
+Used by the demo and by absolute links:
 
-`docker-compose.yml` starts Postgres 17 (`plane` / `postgres` / `postgres` on port 5432) and the app with:
+- `NEXT_PUBLIC_APP_URL`
 
-`DATABASE_URL=postgresql://postgres:postgres@postgres:5432/plane`
+Abra, email, storage, payments, and AI stay empty for the demo. The adapters throw or no-op until they are set. See `docs/INTEGRATIONS.md`.
 
-The compose app service does not set `WORKER_SECRET` or provider keys.
+Also read by code, optional:
+
+- `WORKER_SECRET` — required by `scripts/worker.mjs` and by `POST /api/internal/worker`
+- `RATE_LIMIT_DRIVER`, `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`
+- `MONITORING_DRIVER`, `MONITORING_WEBHOOK_URL`
+- `SEED_ADMIN_EMAIL`, `SEED_ADMIN_PASSWORD`, `SEED_ORG_NAME`, `SEED_ADMIN_NAME` — production seed only
 
 ## Database
 
 ```bash
-cp .env.example .env
+export DATABASE_URL="postgresql://postgres:postgres@localhost:5432/plane"
 npx prisma generate
-npx prisma migrate dev
+npx prisma migrate deploy
 ```
 
-There is no `prisma/migrations` directory. `README.md` mentions `20261006_product_completion` as an incremental migration on top of an older schema. That SQL was not in the upload. A fresh database cannot be migrated until a migration is added.
+The only migration in the tree is `prisma/migrations/20261006000000_init`. It was generated with `prisma migrate diff --from-empty --to-schema-datamodel` and was not applied to a running Postgres in this session. The README name `20261006_product_completion` is an upstream instruction. That migration file is not in this checkout.
 
-`npm run db:seed` is `tsx prisma/seed.ts`. `npm run db:seed:demo` is `tsx prisma/seed-demo.ts`. Neither file exists.
+`npm run db:seed` upserts one owner when the `SEED_*` variables are set. Otherwise it prints a no-op. It does not load Vendimia Tech.
 
-## Environment variables
+`npm run db:seed:demo` upserts organizations, users, memberships, and events only. Tasks, tickets, sponsors, and the rest of the graph stay in the memory store used by `/demo`.
 
-From `.env.example` only:
+## Docker
 
-| Variable | Used by code that exists |
-| --- | --- |
-| `DATABASE_URL` | Prisma schema. No client wrapper yet. |
-| `NEXT_PUBLIC_APP_URL` | `scripts/worker.mjs` (fallback `APP_URL`, then `http://127.0.0.1:3000`). |
-| `ABRA_API_BASE_URL`, `ABRA_API_KEY`, `ABRA_WEBHOOK_SECRET` | `lib/ticketing/abra.ts` |
-| `EMAIL_API_BASE_URL`, `EMAIL_API_KEY`, `EMAIL_FROM` | `lib/email/provider.ts` |
-| `STORAGE_SIGNING_URL`, `STORAGE_API_KEY` | `lib/storage/provider.ts` |
-| `PAYMENT_PROVIDER_NAME`, `PAYMENT_API_BASE_URL`, `PAYMENT_API_KEY`, `PAYMENT_WEBHOOK_SECRET` | `lib/payment/provider.ts` |
-| `AI_API_BASE_URL`, `AI_API_KEY`, `AI_MODEL` | `lib/ai/provider.ts` |
-| `WORKER_SECRET` | `scripts/worker.mjs` only. The API it calls does not exist. |
+`docker-compose.yml` starts Postgres 17 and the app. `Dockerfile` uses `node:22-alpine`, installs production dependencies with `--omit=dev`, then generates the client and runs `npm run build` in the builder stage. This image was not built here. Because `typescript` and `prisma` are devDependencies, `npm install --omit=dev` can skip the CLI the builder later expects. Treat a green `docker build` as unverified.
 
-`lib/rate-limit.ts` also reads `RATE_LIMIT_DRIVER`, `UPSTASH_REDIS_REST_URL`, and `UPSTASH_REDIS_REST_TOKEN` if someone constructs `UpstashRateLimiter`. Those names are not in `.env.example`. `lib/monitoring.ts` reads `MONITORING_DRIVER` and `MONITORING_WEBHOOK_URL`, also absent from `.env.example`. Nothing calls either factory.
+## Vercel
 
-## Worker
+A Vercel project was not created and production was not deployed. A preview deploy can serve `/demo` without `DATABASE_URL`. Do not describe that as production tenancy: login and event reads still use the in-memory store.
 
-`npm run worker` throws immediately when `WORKER_SECRET` is unset. With the secret set, it POSTs to `/api/internal/worker`. That route is not implemented, so the process exits non-zero.
+## Lint script
+
+Next.js 16 removed the `next lint` command (`next lint` is parsed as a project directory and exits with "Invalid project directory"). `npm run lint` runs `eslint .` with `eslint-config-next` 16.3.8.

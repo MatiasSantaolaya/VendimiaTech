@@ -1,32 +1,39 @@
 # Security
 
-This describes controls that exist as code, and the holes where no request handler is mounted.
+## Sessions
 
-## Present in code
+Organizer sessions use cookie `plane_session` (HttpOnly, SameSite=Lax, 14 days). The CSRF token is `plane_csrf` and is readable by the page so the client can send `x-csrf-token`. `plane_demo` marks a demo session. Cookies are `Secure` only when `NODE_ENV=production` and the request is HTTPS, so local HTTP tests can log in.
 
-- `next.config.ts` sets `X-Content-Type-Options`, `X-Frame-Options: DENY`, `Referrer-Policy`, `Permissions-Policy`, and a Content-Security-Policy. `script-src` allows `'self'`, `'unsafe-inline'`, and `https://sdk.abratickets.com` because `PublicEventPage.tsx` loads that script. `'unsafe-inline'` is there so the App Router can hydrate; it is a real weakness.
-- `lib/payment/provider.ts` and `lib/ticketing/abra.ts` verify HMAC-SHA256 hex digests (`sha256=` prefix stripped) with `timingSafeEqual` and reject when the secret or signature is missing.
-- `lib/ticketing/mock.ts` can verify a mock HMAC with the constant `demo-abra-webhook-secret`. No route calls it.
-- `lib/services/attendee-auth.ts` sets `plane_attendee_session` as `HttpOnly`, `SameSite=Lax`, and `Secure` when `NODE_ENV===production`. The raw token is stored only as SHA-256. The module cannot run until `lib/prisma` exists.
-- `lib/domain/password.ts` hashes with scrypt. Nothing calls it.
-- `lib/domain/rbac.ts` and `lib/services/event-access.ts` authorize by membership role, not by email. `canReadSponsor` in the domain helper returns false when the actor’s email equals `contactEmail` but there is no `EntityAccess` row. No API uses that helper yet.
-- `scripts/worker.mjs` sends `WORKER_SECRET` in `x-plane-worker-secret`. There is no server check because the route is missing.
-- `lib/rate-limit.ts` implements an in-memory limiter and an Upstash REST limiter. Nothing calls `createRateLimiter()`.
+Attendee magic links are a separate cookie, `plane_attendee_session`, implemented in the uploaded `lib/services/attendee-auth.ts`. The demo page does not call that helper. The demo attendee persona is a normal user session (`usr_ines`) plus `EntityAccess` for `att_ines`.
 
-## Not present
+Passwords in the demo store are scrypt hashes (`lib/domain/password.ts`), not plaintext.
 
-- No login, logout, session cookie for organizers, CSRF token, invitation accept route, or brute-force counter wired to a request.
-- No server authorization on `/api/events/:id/modules`. `QuickCreate.tsx` posts JSON with no CSRF header. The endpoint does not exist, so this is not exploitable yet and is also not protected.
-- No tenant guard in front of a handler. Cross-organization denial is not testable.
-- No audit write on a user action. `audit()` only inserts a row when called.
-- Webhook routes are not mounted, so the signature helpers are unused.
-- Secrets are read from `process.env` in the adapters. `.env` is gitignored. `.env.example` has empty values. No secret scanning has been run.
-- `public/sw.js` caches same-origin GET responses, including HTML, and falls back to `/`. That can replay a stale authenticated page. Playwright is configured with `serviceWorkers: "block"`, but there is no E2E suite yet.
+## CSRF and origin
 
-## Cookies that the uploaded attendee module sets
+Mutations require a same-origin `Origin` that matches the `Host` header (or `x-forwarded-host`). CSRF is required except:
 
-| Cookie | HttpOnly | Secure | SameSite |
-| --- | --- | --- | --- |
-| `plane_attendee_session` | yes | production only | Lax |
+- `POST /api/auth/login`
+- `POST /api/auth/invitations/accept`
+- `POST /api/events/:id/modules` (the uploaded `QuickCreate` client does not send a CSRF header; the origin check still applies)
+- `POST /api/ticketing/webhook` (HMAC signature)
+- `POST /api/internal/worker` (`x-plane-worker-secret` must equal `WORKER_SECRET`)
 
-Organizer session cookies are not implemented.
+## Brute force and rate limit
+
+Login records failures per `email|ip`. Five failures in 15 minutes return 429. The API allows 180 requests per minute per IP on the memory limiter. The Upstash adapter is unused unless `RATE_LIMIT_DRIVER=upstash` and both Upstash variables are set. The memory limiter is per process and resets on cold start.
+
+## Tenancy
+
+`requireEvent` returns 404 when the event id is unknown and 403 when the actor has no membership on that event's organization or event. A Vendimia user requesting `evt_bodega` gets 403. Authorization uses membership and `EntityAccess`, not the email address. `rio@sponsors.demo` is both a sponsor contact and the login of `usr_snoop`, who has no sponsor entity access.
+
+## Headers
+
+`next.config.ts` sends `X-Content-Type-Options`, `X-Frame-Options: DENY`, `Referrer-Policy`, `Permissions-Policy`, and a Content-Security-Policy that allows `https://sdk.abratickets.com` for the uploaded checkout script. Development adds `'unsafe-eval'` because the Next.js dev client needs it. Production CSP does not include `unsafe-eval`.
+
+## What is not production-hardened yet
+
+- Event APIs ignore Prisma and share one in-memory graph for the process. That is acceptable for `/demo` and unsafe as a multi-tenant production database.
+- Login always sets `plane_demo=1`, including when `DATABASE_URL` is present.
+- There is no storage adapter that writes to disk, and uploaded files are not implemented in the UI.
+- Webhook signature comparison uses `timingSafeEqual` after a length check. Abra verification returns false when `ABRA_WEBHOOK_SECRET` is empty.
+- Service worker caches GET responses, including HTML. That can serve a stale demo page after a deploy. Playwright blocks service workers; a browser does not.

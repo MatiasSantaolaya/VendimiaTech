@@ -1,25 +1,35 @@
 # Start here
 
-PlanE (`plane-event-os` `5.0.0-rc.1`) is the event operating system in this repository. The uploaded project root is the git root. There is no `production/` directory and no Desktop `PlanE` folder.
+PlanE (`plane-event-os` `5.0.0-rc.1`) is the event operating system in this repository. The project root is the git root. There is no `production/` directory and no Desktop `PlanE` folder.
 
-## What is in the tree
+## Run the demo
 
-- Stack contract: `package.json`, `tsconfig.json`, `vercel.json`, `Dockerfile`, `docker-compose.yml`, `.env.example`.
-- Uploaded UI that is not mounted on a route: `components/ModuleShell.tsx`, `components/PublicEventPage.tsx`, `components/QuickCreate.tsx`, `components/RegisterSW.tsx`.
-- Uploaded server modules that import `lib/prisma` and `lib/auth`. Those two files are not in the tree, so `lib/services/*` does not compile yet.
-- Provider adapters: `lib/ai/provider.ts`, `lib/email/provider.ts`, `lib/payment/provider.ts`, `lib/storage/provider.ts`, `lib/ticketing/abra.ts`.
-- Pure domain helpers (not called by any route): `lib/domain/*`, `lib/ticketing/mock.ts`, `lib/rate-limit.ts`, `lib/monitoring.ts`.
-- `prisma/schema.prisma` only. No `prisma/migrations`, no `prisma/seed.ts`, no `prisma/seed-demo.ts`.
-- `public/sw.js` and `scripts/worker.mjs`.
-- `next.config.ts` defines security headers. There is no `app/` directory, so Next.js has nothing to serve.
+The demo does not need PostgreSQL, Abra, or API keys.
 
-## What you cannot do yet
+```bash
+npm install
+npm run dev
+```
 
-`npm run dev` has no pages. `/demo`, `/login`, `/api/*`, and `/events/[slug]/*` are not implemented. `npm test` has no test files. `npm run db:seed` and `npm run db:seed:demo` point at files that do not exist. Nothing in this checkout has been installed, typechecked, or built.
+Open `http://localhost:3000/demo`. That route signs in Ana Organizer on Vendimia Tech 2027 and redirects to the command center. Password for every demo user: `vendimia-demo`.
+
+## What was executed on 2026-10-06
+
+| Command | Result |
+| --- | --- |
+| `npm install` | Completed. `prisma@latest` resolved to Prisma 8.0.0-rc.20, which has no `prisma generate`. `@prisma/client` and `prisma` are pinned to `6.19.3`. |
+| `npx prisma generate` | Completed with `DATABASE_URL` set to the example local URL. |
+| `npm run typecheck` | Passed after the pin and the type fixes in this branch. |
+| `npm run lint` | Passed with 0 errors. Next.js 16.3.8 removed `next lint`, so the script runs `eslint .`. |
+| `npm test` | 7 files, 19 tests, passed. |
+| `npm run build` | Passed. Next.js 16.3.8, compiled successfully. |
+| `npm run test:e2e` | 2 Playwright tests passed (Chromium). |
+
+`docker build` and `vercel --prod` were not run.
 
 ## Read next
 
-- `docs/ARCHITECTURE.md` — file map and the breaks between files.
-- `docs/KNOWN-LIMITATIONS.md` — gaps, including Abra and demo.
-- `docs/DEPLOYMENT.md` — env vars and the Docker/Vercel files as they are.
-- `README.md` — original PlanE product description. Treat the command blocks as the upstream instructions, not as proof this checkout runs.
+- `docs/DEMO.md` — fixture, personas, and what `/demo` does.
+- `docs/ARCHITECTURE.md` — how the demo store and the Prisma schema relate.
+- `docs/KNOWN-LIMITATIONS.md` — what is still partial.
+- `docs/API.md` — routes that exist today.

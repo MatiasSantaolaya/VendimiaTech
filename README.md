@@ -40,6 +40,8 @@ Managed PostgreSQL, transactional email, object storage, queue scheduling, monit
 
 ## This repository
 
-The PlanE project root lives at the root of this git checkout, not under `production/` or a Desktop folder. The `cd production` steps above are the upstream instructions for a nested folder that is not in this checkout.
+The PlanE project root lives at the root of this git checkout, not under `production/` or a Desktop folder. The `cd production` steps above are the upstream instructions for a nested folder that is not in this checkout. The migration name `20261006_product_completion` is also an upstream instruction. This checkout has `prisma/migrations/20261006000000_init` instead, generated from an empty database and not applied here.
 
-As of the current tree there is no `app/` directory, no `lib/prisma.ts`, no `lib/auth.ts`, no migration, and no seed file. `/demo` is not a route yet. `npm run db:seed` and `npm run db:seed:demo` point at files that are not created. Read `START-HERE.md` and `docs/KNOWN-LIMITATIONS.md` before running commands. `package.json` still lists `lint`, `typecheck`, `test`, `test:e2e`, `e2e`, `build`, and `worker` for when those entry points exist.
+`/demo` is implemented and was exercised by Playwright without PostgreSQL. `lib/prisma.ts`, `lib/auth.ts`, `prisma/seed.ts`, and `prisma/seed-demo.ts` exist. The seed scripts do not load the full event graph: the demo graph is in memory. App routes do not query Prisma yet, so a `DATABASE_URL` does not by itself make the UI production-backed. Read `START-HERE.md` and `docs/KNOWN-LIMITATIONS.md`.
+
+On 2026-10-06 this branch passed `npm run typecheck`, `npm run lint` (`eslint .`, because Next.js 16 removed `next lint`), `npm test` (19 tests), `npm run build` (Next.js 16.3.8), and `npm run test:e2e` (2 tests). `docker build` and `vercel --prod` were not run. Prisma is pinned to 6.19.3 so `prisma generate` still exists.

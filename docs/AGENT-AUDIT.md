@@ -76,7 +76,7 @@ The empty-repo finding above was true at the start of the branch. The user then 
 
 | File | What it specifies |
 | --- | --- |
-| `package.json` | `plane-event-os` `5.0.0-rc.1`. Scripts: `dev`, `build` (`next build`), `start`, `db:generate`, `db:migrate`, `db:validate`, `lint` (`next lint`), `db:seed` (`tsx prisma/seed.ts`), `typecheck`, `e2e` (`playwright test`), `worker` (`node scripts/worker.mjs`). Dependencies: `next`, `react`, `react-dom`, `@prisma/client` at `latest`. Dev: `prisma`, `typescript`, `tsx`, `@playwright/test` at `latest`. |
+| `package.json` | `plane-event-os` `5.0.0-rc.1`. Scripts: `dev`, `build` (`next build`), `start`, `db:generate`, `db:migrate`, `db:validate`, `lint` (uploaded as `next lint`; Next.js 16.3.8 removed that command, so this branch runs `eslint .`), `db:seed` (`tsx prisma/seed.ts`), `typecheck`, `e2e` (`playwright test`), `worker` (`node scripts/worker.mjs`). Dependencies: `next`, `react`, `react-dom` at `latest` (Next resolved to 16.3.8). `@prisma/client` and `prisma` are pinned to 6.19.3 because `latest` was Prisma 8.0.0-rc.20 and that CLI has no `generate`. Dev: `typescript`, `tsx`, `@playwright/test` at `latest`. |
 | `tsconfig.json` | `strict`, `allowJs: false`, `baseUrl` `.`, `@/*` → `./*` (repo root, not `src/`). |
 | `vercel.json` | `framework: nextjs`, `buildCommand: next build`, `installCommand: npm install --no-audit --no-fund`. |
 | `Dockerfile` | Node 22 Alpine. Deps stage `npm install --omit=dev`. Builder runs `npx prisma generate` then `npm run build`. Runner copies `.next`, `public`, `prisma`. |
@@ -113,10 +113,20 @@ Imports decided the directories. Duplicate names were not merged.
 - AI, email, storage, and payments throw clear not-configured errors. The local/demo brain is a separate rule engine so the HTTP provider stays unchanged.
 - The service worker file is unchanged. Playwright blocks service workers so that cache cannot freeze `/demo` during E2E.
 
-### Schema gap
+### Schema
 
-The upload names `20261006_product_completion` but does not include a previous baseline schema. `prisma/schema.prisma` is in the repo. `prisma/migrations/` is not. Fresh Postgres cannot be migrated yet.
+The upload names `20261006_product_completion` but does not include a previous baseline schema. This branch adds `prisma/schema.prisma` and `prisma/migrations/20261006000000_init/migration.sql`, generated with `prisma migrate diff --from-empty`. The SQL was not applied to a database. Agenda rows are `ProgramSession` because the auth model is already named `Session`. `AttendeeSession.id` and `AuditLog.id` use `@default(cuid())` so the uploaded create calls typecheck.
 
-## Docs pass (this revision)
+## Docs pass
 
-`START-HERE.md` and `docs/*.md` were written from the tree as it sits: uploaded adapters and components, domain helpers, and a Prisma schema, with no `app/` routes and no `lib/prisma.ts` or `lib/auth.ts`. README and `VERCEL-DEMO.md` were corrected where they said `/demo` and the seed scripts already run. Those docs must be updated again when routes exist. Unbuilt screens are not marked done.
+An earlier docs commit described missing `app/` routes. That note is obsolete. `START-HERE.md`, `docs/*.md`, the README "This repository" section, and `VERCEL-DEMO.md` now match the running tree: `/demo` exists, tests and `next build` passed, and the Prisma request path is still unwired. Unbuilt behavior stays in `docs/KNOWN-LIMITATIONS.md`.
+
+## Verification (2026-10-06)
+
+- `npm run typecheck` passed.
+- `npm run lint` passed (0 errors, warnings cleared).
+- `npm test`: 7 files, 19 tests passed.
+- `npm run build`: Next.js 16.3.8 compiled successfully. Routes: `/`, `/login`, `/demo`, `/api/[[...path]]`, `/events/[slug]/[[...module]]`, `/attendee/[eventId]`, `/invite/[token]`.
+- `npm run test:e2e`: 2 passed. Chromium installed. First run failed because `/demo` redirected to `localhost` while Playwright used `127.0.0.1`, so the session cookie was dropped. The redirect now uses the request `Host`.
+- `docker build`: not run.
+- `vercel --prod`: not run.

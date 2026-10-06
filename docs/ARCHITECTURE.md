@@ -1,56 +1,54 @@
 # Architecture
 
-Status: partial library tree. No running application.
+PlanE is a Next.js App Router application. Code lives at the repository root (`app/`, `lib/`, `components/`). The path alias `@/*` maps to that root.
 
-## Stack that is actually declared
+## Two persistence paths
 
-`package.json` `5.0.0-rc.1`: Next.js, React, Prisma Client, Zod. Dev: Prisma CLI, TypeScript, tsx, Playwright, Vitest, ESLint. `tsconfig.json` maps `@/*` to the repository root (`./*`), `allowJs: false`. `vercel.json` builds with `next build`.
-
-## How the uploaded pieces fit
-
-```
-components/ModuleShell.tsx        links to /events/[slug]/...
-components/PublicEventPage.tsx    public page + <abra-checkout>
-components/QuickCreate.tsx        POST /api/events/:eventId/modules
-components/RegisterSW.tsx         registers /sw.js
-scripts/worker.mjs                POST /api/internal/worker  (x-plane-worker-secret)
-lib/services/event-access.ts      Prisma membership lookup
-lib/services/event-by-slug.ts     requires lib/auth getCurrentUser
-lib/services/event-health.ts      writes Event.healthScore
-lib/services/audit.ts             AuditLog.metadata
-lib/services/attendee-auth.ts     cookie plane_attendee_session
-lib/ticketing/abra.ts             fetch ABRA_API_BASE_URL + relative paths
-lib/{ai,email,payment,storage}    HTTP adapters, fail if env is empty
-```
-
-None of those components or services are imported by a Next.js route. `app/` does not exist.
-
-`lib/services/event-access.ts` imports `../../lib/prisma` and `@prisma/client`. From `lib/services/` that path is `lib/prisma`, and that file is missing. `lib/services/event-by-slug.ts` imports `../../lib/auth`, also missing. `MembershipRole` is used as a type but Prisma Client has not been generated in this workspace (`node_modules` is absent).
-
-## Domain code that exists and is unused
-
-| Module | Role |
+| Path | Status |
 | --- | --- |
-| `lib/domain/health.ts` | Copy of the arithmetic in `event-health.ts`, plus separate area weights. Not called by `event-health.ts`. |
-| `lib/domain/finance.ts` | Revenue, cost, margin, ROI, budget variance. |
-| `lib/domain/graph.ts` | Dependency blockers and a node/edge builder. |
-| `lib/domain/matchmaking.ts` | Transparent point rules. |
-| `lib/domain/forecast.ts` | Heuristic projection, not a model. |
-| `lib/domain/brain.ts` | Keyword answers and a confirmation gate. Not wired to `lib/ai/provider.ts`. |
-| `lib/domain/rbac.ts` | Role helpers parallel to `canManage` / `canOperate`. Not used by the Prisma access module. |
-| `lib/ticketing/mock.ts` | In-memory Abra stand-in and HMAC check. Not selected by any route. |
-| `lib/rate-limit.ts`, `lib/monitoring.ts` | Adapters. Not referenced. |
+| Demo memory store (`lib/demo/store.ts`, `globalThis.planeDemo`) | Used by every page and by `handleApi`. `/demo` sets `plane_demo=1` and a session cookie. |
+| PostgreSQL via Prisma (`prisma/schema.prisma`, `lib/prisma.ts`, `lib/services/*`) | Schema, client, and an initial migration exist. Uploaded services (`event-access`, `event-health`, `audit`, `attendee-auth`, `event-by-slug`) query Prisma. The App Router and `lib/server/api.ts` do not call them. A request with `DATABASE_URL` set still reads and writes the memory store, and login still sets `plane_demo=1`. |
 
-## Data model
+Domain rules (health, finance, graph, matchmaking, forecast, RBAC, brain) are pure functions in `lib/domain`. The demo view (`lib/server/view.ts`) calls those functions on the memory fixture. `lib/services/event-health.ts` is the uploaded Prisma query and is not invoked by the UI.
 
-`prisma/schema.prisma` describes organizations, users, sessions, event membership, entity access, tasks, sponsors (`SponsorDeal` / `SponsorDeliverable`), speakers, sessions, vendors, attendees, tickets, incidents, run of show, finance, notifications, and ticketing sync tables.
+## Request flow
 
-The uploaded health query depends on specific stored strings: task status `DONE` | `CANCELLED` | `BLOCKED`, incident status `open`, run-of-show status `done`, deliverable status `done` through `deal.eventId`. The schema uses `String` for those fields so those queries can match. There is no migration SQL yet, so Postgres has nothing to apply.
+1. `app/demo/route.ts` opens a session for `usr_ana` and redirects to `/events/vendimia-tech-2027/control-center`. The redirect host is the incoming `Host` header so a browser on `127.0.0.1` does not jump to `localhost` and drop the cookie.
+2. `app/events/[slug]/[[...module]]/page.tsx` loads the workspace from cookies and renders one module.
+3. `components/ModuleShell.tsx` is the uploaded nav. It is not edited. Sections: control-center, planning, finance, commercial, content, operations, experience, analytics, ai, website, integrations.
+4. Mutations go to `app/api/[[...path]]/route.ts` → `handleApi`.
 
-## Intended request path (not built)
+## Tenancy and roles
 
-Browser → `app/` route → `getCurrentUser` (`lib/auth`) → `getEventAccess` → Prisma or, for `/demo`, an in-memory store that never constructs a client. That split is required by `VERCEL-DEMO.md` and is not implemented.
+`lib/domain/rbac.ts` mirrors the uploaded access rules. Management roles: `OWNER`, `ADMIN`, `EVENT_MANAGER`, `FUNCTIONAL_LEAD`. `STAFF` can operate. Portal roles (`SPONSOR`, `SPEAKER`, `VENDOR`, `ATTENDEE`) see only their entity when `EntityAccess` says so. Email is not an authorization key. Org Bodega Sur (`org_bodega`, event `evt_bodega`) exists so a Vendimia session cannot read it. The API test and the Playwright request both observed HTTP 403.
 
 ## Event graph
 
-`lib/domain/graph.ts` can build nodes and dependency blockers from plain arrays. No screen reads it. `ModuleShell` is only a nav shell; it does not render a graph.
+Tasks, dependencies, incidents, run-of-show items, sponsors, sessions, and deliverables are nodes in `lib/domain/graph.ts`. The command center prints node, edge, and blocker counts from that function. Blockers are computed from unfinished dependencies and from tasks whose status is `BLOCKED`.
+
+## Health
+
+`officialHealthScore` in `lib/domain/health.ts` copies the uploaded formula in `lib/services/event-health.ts`: start at 100, subtract task completion, overdue, blocked, open incidents (`status === "open"`), critical run-of-show items that are not `done`, and overdue deliverables that are not `done`. Area scores are an extra weighted view. The number on the command center is that calculation against the live fixture, not a constant.
+
+## Agenda model name
+
+The schema cannot have two models named `Session`. Auth sessions stay `Session`. Program items are `ProgramSession`. The demo store calls the array `sessionsProgram`.
+
+## Providers
+
+Each integration has an HTTP adapter that fails closed when its env vars are empty, plus a local stand-in:
+
+| Concern | HTTP adapter | Local stand-in |
+| --- | --- | --- |
+| Ticketing | `lib/ticketing/abra.ts` | `lib/ticketing/mock.ts` |
+| Email | `lib/email/provider.ts` | console provider when `EMAIL_API_BASE_URL` is empty |
+| Payments | `lib/payment/provider.ts` | none beyond the HTTP client; demo finance does not charge cards |
+| Storage | `lib/storage/provider.ts` | no disk adapter |
+| AI | `lib/ai/provider.ts` | `lib/domain/brain.ts` answers from demo data |
+| Jobs | `scripts/worker.mjs` → `POST /api/internal/worker` | in-memory job list |
+| Rate limit | `UpstashRateLimiter` | `MemoryRateLimiter` |
+| Monitoring | `WebhookMonitoringProvider` | `ConsoleMonitoringProvider` |
+
+## Service worker
+
+`public/sw.js` is the uploaded file. It caches same-origin GET responses. Playwright sets `serviceWorkers: "block"` so that cache does not freeze the demo during E2E. The manifest is `public/manifest.webmanifest`.

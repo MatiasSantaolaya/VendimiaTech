@@ -1,58 +1,59 @@
 # API
 
-No file under `app/api` exists. The handlers below are what current clients already call. They return connection errors, not JSON.
+All routes are handled by `app/api/[[...path]]/route.ts`. Responses are JSON unless noted. Errors look like `{ "error": { "code": "...", "message": "..." } }`.
 
-## Called by code in the repo, not implemented
+These handlers read and write the in-memory demo store. They do not query Prisma.
 
-### `POST /api/internal/worker`
+## Public
 
-`scripts/worker.mjs`
+| Method | Path | Behavior |
+| --- | --- | --- |
+| GET | `/api/health` | `{ ok, service: "plane", mode, demoReady: true }`. `mode` is `database-or-demo` when `DATABASE_URL` is set, otherwise `demo`. The mode string does not switch the data source. |
+| POST | `/api/auth/login` | Body `{ email, password }`. Sets session, CSRF, and `plane_demo=1`. 401 on bad credentials, 429 after 5 failures. |
+| POST | `/api/auth/logout` | Revokes the session cookie. |
+| GET | `/api/auth/session` | Current user or 401. |
+| POST | `/api/auth/invitations/accept` | Body `{ token, name, password }`. Demo token: `demo-invite-token`. |
+| POST | `/api/ticketing/webhook` | `x-ticketing-provider: mock` uses the mock HMAC secret `demo-abra-webhook-secret`. Any other provider uses `AbraTicketsProvider.verifyWebhook`. Signature header: `x-signature` or `x-abra-signature`. |
+| POST | `/api/internal/worker` | Header `x-plane-worker-secret`. Drains in-memory EMAIL jobs into the email outbox. 401 without `WORKER_SECRET`. |
 
-- Header: `x-plane-worker-secret: $WORKER_SECRET`
-- Body: empty
-- Success: process prints the response text and exits 0
-- Failure: prints the body and exits 1
-- If `WORKER_SECRET` is unset, the script throws before the request
+`GET /demo` is a page route, not under `/api`. It sets the same cookies and redirects to the command center.
 
-### `POST /api/events/:eventId/modules`
+## Authenticated event routes
 
-`components/QuickCreate.tsx`
+Prefix: `/api/events/:eventId`. Cross-tenant and missing membership return 403 with code `TENANT_FORBIDDEN`. Unknown id returns 404.
 
-```json
-{ "resource": "task|expense|revenue|sponsor|speaker|vendor|session|campaign|incident|ros", "...fields": "..." }
-```
+| Method | Path | Who |
+| --- | --- | --- |
+| GET | `/api/events/:eventId` | Any member. Returns id, name, slug, organizationId. |
+| GET | `/api/events/:eventId/finance` | Roles allowed to read finance. |
+| POST | `/api/events/:eventId/modules` | Body `{ resource, ...fields }`. Resources match `QuickCreate`: task, expense, revenue, sponsor, speaker, vendor, session, campaign, incident, ros. |
+| PATCH | `/api/events/:eventId/tasks/:taskId` | Operate roles. Body `{ status?, priority?, approvalStatus? }`. |
+| POST | `/api/events/:eventId/tasks/bulk` | Body `{ ids, status }`. |
+| PATCH | `/api/events/:eventId/incidents/:incidentId` | Operate roles. Body `{ status }`. Resolving uses the lowercase status `resolved` so the health query for `open` drops it. |
+| POST | `/api/events/:eventId/brain` | Manage or operate. Body `{ question }`. Does not mutate. Imperative answers include `requiresConfirmation`. |
+| POST | `/api/events/:eventId/brain/confirm` | Operate. Body `{ type, taskId?, incidentId?, confirm: true }`. |
+| POST | `/api/events/:eventId/ticketing/sync` | Manage. Marks the mock connection `CONNECTED` and writes a sync log that mentions remote code `ABRA-EXTRA-1`. |
+| POST | `/api/events/:eventId/ticketing/probe` | Calls `abraTickets.syncEvent`. Without Abra env this returns 409. |
+| GET | `/api/events/:eventId/export?kind=tasks\|finance` | Manage. `text/csv`. |
+| GET | `/api/events/:eventId/report` | Manage. `text/plain` summary. |
+| POST | `/api/events/:eventId/check-in` | Operate. Body `{ code }`. |
+| POST | `/api/events/:eventId/networking` | Attendee entity access. Body `{ toAttendeeId }`. |
+| POST | `/api/events/:eventId/polls/:pollId/vote` | Attendee entity access. Body `{ optionIndex }`. |
 
-Field names by resource:
+## Demo only
 
-| resource | fields |
+| Method | Path | Behavior |
+| --- | --- | --- |
+| POST | `/api/demo/view-as` | Requires cookie `plane_demo=1`. Body `{ userId }` limited to the six personas. Replaces the session cookie. |
+
+## Pages
+
+| Path | Notes |
 | --- | --- |
-| task | `title` |
-| expense | `description`, `amount` (ARS, not cents) |
-| revenue | `type`, `description`, `amount` |
-| sponsor | `companyName`, `amount` |
-| speaker | `personName`, `email`, `company` |
-| vendor | `name`, `category`, `amount` |
-| session | `title`, `startAt` (ISO) |
-| campaign | `name`, `channel`, `budget` |
-| incident | `title`, `severity` |
-| ros | `title`, `startAt`, `area`, `location` |
-
-The client reloads the page on HTTP 200. It does not send a CSRF header.
-
-## Provider HTTP, outbound only
-
-These are clients, not PlanE routes.
-
-| Adapter | Request |
-| --- | --- |
-| `lib/ai/provider.ts` | `POST {AI_API_BASE_URL}/chat/completions` |
-| `lib/email/provider.ts` | `POST {EMAIL_API_BASE_URL}/send` when the base URL is set; otherwise logs in non-production |
-| `lib/payment/provider.ts` | `POST {PAYMENT_API_BASE_URL}/checkout` |
-| `lib/storage/provider.ts` | `POST STORAGE_SIGNING_URL` |
-| `lib/ticketing/abra.ts` | `GET {ABRA_API_BASE_URL}/events/:id`, `/tickets`, `/attendees`, `/orders` |
-
-Abra calls throw `Abra Tickets integration is not configured` when the base URL or API key is empty. Relative paths are fixed in that file. See `docs/INTEGRATIONS.md`.
-
-## Not implemented, and not called by current UI
-
-Auth, health, finance, graph, brain, exports, webhooks, check-in, networking, invitations, and demo view-as. Do not document them as available.
+| `/` | Links to `/demo` and `/login`. |
+| `/login` | Spanish form. Demo hint shows the password. |
+| `/demo` | Zero-config organizer session. |
+| `/events/[slug]` | Public page. Agenda speaker names come from the demo speakers, not from ids. |
+| `/events/[slug]/[module]` | Authenticated module. Missing session renders "Necesitás sesión". |
+| `/attendee/[eventId]` | Attendee link target from the public page. |
+| `/invite/[token]` | Accept-invite form. |
