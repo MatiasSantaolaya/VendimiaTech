@@ -67,3 +67,56 @@ Everything in the product spec: auth, RBAC, event core, command center, health, 
 ## Definition of done
 
 A feature is done only when persistence (memory and/or Prisma), API, permission check, UI, graph/health/audit hook where it applies, and error handling exist. Tests cover the domain rules and the tenant boundary. Items that stay thinner are listed honestly in `docs/KNOWN-LIMITATIONS.md` and the release report, not marked complete.
+
+## Uploaded baseline (second and third drops)
+
+The empty-repo finding above was true at the start of the branch. The user then uploaded the real PlanE root and a partial source drop. Those files are the stack baseline and are preserved.
+
+### Root contract
+
+| File | What it specifies |
+| --- | --- |
+| `package.json` | `plane-event-os` `5.0.0-rc.1`. Scripts: `dev`, `build` (`next build`), `start`, `db:generate`, `db:migrate`, `db:validate`, `lint` (`next lint`), `db:seed` (`tsx prisma/seed.ts`), `typecheck`, `e2e` (`playwright test`), `worker` (`node scripts/worker.mjs`). Dependencies: `next`, `react`, `react-dom`, `@prisma/client` at `latest`. Dev: `prisma`, `typescript`, `tsx`, `@playwright/test` at `latest`. |
+| `tsconfig.json` | `strict`, `allowJs: false`, `baseUrl` `.`, `@/*` → `./*` (repo root, not `src/`). |
+| `vercel.json` | `framework: nextjs`, `buildCommand: next build`, `installCommand: npm install --no-audit --no-fund`. |
+| `Dockerfile` | Node 22 Alpine. Deps stage `npm install --omit=dev`. Builder runs `npx prisma generate` then `npm run build`. Runner copies `.next`, `public`, `prisma`. |
+| `docker-compose.yml` | Postgres 17 Alpine (`plane` / `postgres` / `postgres`) and app on port 3000 with `DATABASE_URL` pointing at the `postgres` service. |
+| `.env.example` | `DATABASE_URL`, `NEXT_PUBLIC_APP_URL`, Abra (`ABRA_API_BASE_URL`, `ABRA_API_KEY`, `ABRA_WEBHOOK_SECRET`), email (`EMAIL_API_BASE_URL`, `EMAIL_API_KEY`, `EMAIL_FROM`), storage presign (`STORAGE_SIGNING_URL`, `STORAGE_API_KEY`), payments (`PAYMENT_PROVIDER_NAME`, `PAYMENT_API_BASE_URL`, `PAYMENT_API_KEY`, `PAYMENT_WEBHOOK_SECRET`), AI (`AI_API_BASE_URL`, `AI_API_KEY`, `AI_MODEL`), `WORKER_SECRET`. |
+| `README.md` | Multi-actor PlanE surface, App Router + Prisma, Abra embed without duplicating ticketing, externalized production dependencies. Mentions an incremental `20261006_product_completion` migration that was **not** in the upload. |
+| `VERCEL-DEMO.md` | `/demo` is zero-config and isolated from the production data layer. |
+
+Added on top of that contract, without removing it: `test`, `test:e2e`, `db:seed:demo`, a postinstall that runs `prisma generate` when the CLI is present, `zod`, Vitest, ESLint, and TypeScript DOM types. `build` stays `next build`.
+
+### Source placement
+
+Imports decided the directories. Duplicate names were not merged.
+
+| Upload | Path | Why |
+| --- | --- | --- |
+| `sw_8a75.js` | `public/sw.js` | `RegisterSW` registers `/sw.js`. |
+| `worker_51d7.mjs` | `scripts/worker.mjs` | `package.json` `worker` script. POSTs `/api/internal/worker` with `x-plane-worker-secret`. |
+| `provider_c822.ts` | `lib/ai/provider.ts` | `AiProvider` / `AI_API_BASE_URL` `/chat/completions`. |
+| `provider_d601.ts` + `types_1346.ts` | `lib/email/provider.ts`, `lib/email/types.ts` | `./types` plus `EMAIL_API_BASE_URL`. |
+| `provider_2930.ts` + `types_468a.ts` | `lib/payment/provider.ts`, `lib/payment/types.ts` | `./types` plus `PAYMENT_*`. |
+| `provider_84ea.ts` + `types_841c.ts` | `lib/storage/provider.ts`, `lib/storage/types.ts` | `./types` plus `STORAGE_SIGNING_URL`. |
+| `abra_9a5a.ts` + `types_3523.ts` | `lib/ticketing/abra.ts`, `lib/ticketing/types.ts` | `./types`. Relative paths under `ABRA_API_BASE_URL`. Fail closed without credentials. |
+| `attendee-auth_d6b8.ts`, `audit_c2b0.ts`, `event-access_a53d.ts`, `event-by-slug_0c5c.ts`, `event-health_1578.ts` | `lib/services/*` | `../../lib/prisma` and `../../lib/auth` resolve from `lib/services/`. |
+| `ModuleShell_8bec.tsx`, `PublicEventPage_9915.tsx`, `QuickCreate_e840.tsx`, `RegisterSW_2ac3.tsx` | `components/*` | UI shell. Routes are `/events/[slug]/...`. Quick create posts `/api/events/[eventId]/modules`. |
+
+### Behavior that later code must keep
+
+- Roles that can manage: `OWNER`, `ADMIN`, `EVENT_MANAGER`, `FUNCTIONAL_LEAD`. Staff can operate. `getEventAccess` is membership-based (`OrganizationMember` or `EventMember`), not email-based.
+- Health query strings are exact: task statuses `DONE` / `CANCELLED` / `BLOCKED`; incidents `open`; run-of-show `done` with `critical`; deliverables via `deal.eventId` and status `done`.
+- Attendee auth is a separate cookie, `plane_attendee_session`, with hashed magic tokens.
+- Audit rows use `metadata`, not a before/after pair, in the uploaded helper.
+- Public checkout embed is the uploaded `<abra-checkout>` plus `https://sdk.abratickets.com/v2/checkout.js`. No extra Abra routes were added.
+- AI, email, storage, and payments throw clear not-configured errors. The local/demo brain is a separate rule engine so the HTTP provider stays unchanged.
+- The service worker file is unchanged. Playwright blocks service workers so that cache cannot freeze `/demo` during E2E.
+
+### Schema gap
+
+The upload names `20261006_product_completion` but does not include a previous baseline schema. `prisma/schema.prisma` is in the repo. `prisma/migrations/` is not. Fresh Postgres cannot be migrated yet.
+
+## Docs pass (this revision)
+
+`START-HERE.md` and `docs/*.md` were written from the tree as it sits: uploaded adapters and components, domain helpers, and a Prisma schema, with no `app/` routes and no `lib/prisma.ts` or `lib/auth.ts`. README and `VERCEL-DEMO.md` were corrected where they said `/demo` and the seed scripts already run. Those docs must be updated again when routes exist. Unbuilt screens are not marked done.
