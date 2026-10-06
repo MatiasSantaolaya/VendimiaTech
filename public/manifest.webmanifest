@@ -1,0 +1,9 @@
+{
+  "name": "PLANe",
+  "short_name": "PLANe",
+  "start_url": "/demo",
+  "display": "standalone",
+  "background_color": "#f3eee4",
+  "theme_color": "#6f2436",
+  "icons": [{ "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml" }]
+}

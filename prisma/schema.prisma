@@ -1,0 +1,733 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum MembershipRole {
+  OWNER
+  ADMIN
+  EVENT_MANAGER
+  FUNCTIONAL_LEAD
+  STAFF
+  SPONSOR
+  SPEAKER
+  VENDOR
+  ATTENDEE
+}
+
+enum EventStatus {
+  DRAFT
+  PLANNING
+  LIVE
+  COMPLETED
+  ARCHIVED
+}
+
+model Organization {
+  id          String               @id
+  name        String
+  slug        String               @unique
+  createdAt   DateTime             @default(now())
+  members     OrganizationMember[]
+  events      Event[]
+  invitations Invitation[]
+}
+
+model User {
+  id           String               @id
+  email        String               @unique
+  name         String
+  passwordHash String
+  createdAt    DateTime             @default(now())
+  sessions     Session[]
+  orgMembers   OrganizationMember[]
+  eventMembers EventMember[]
+  entityAccess EntityAccess[]
+  auditLogs    AuditLog[]
+}
+
+model OrganizationMember {
+  id             String         @id
+  organizationId String
+  userId         String
+  role           MembershipRole
+  organization   Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user           User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, userId])
+}
+
+model EventMember {
+  id      String         @id
+  eventId String
+  userId  String
+  role    MembershipRole
+  event   Event          @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  user    User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([eventId, userId])
+}
+
+model EntityAccess {
+  id         String         @id
+  userId     String
+  eventId    String
+  role       MembershipRole
+  entityType String
+  entityId   String
+  user       User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  event      Event          @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@index([userId, eventId])
+}
+
+model Session {
+  id        String    @id
+  userId    String
+  tokenHash String    @unique
+  csrfToken String
+  expiresAt DateTime
+  revokedAt DateTime?
+  createdAt DateTime  @default(now())
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Invitation {
+  id             String         @id
+  organizationId String
+  eventId        String?
+  email          String
+  role           MembershipRole
+  entityType     String?
+  entityId       String?
+  tokenHash      String         @unique
+  expiresAt      DateTime
+  acceptedAt     DateTime?
+  createdById    String
+  createdAt      DateTime       @default(now())
+  organization   Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  event          Event?         @relation(fields: [eventId], references: [id], onDelete: Cascade)
+}
+
+model Event {
+  id                 String               @id
+  organizationId     String
+  name               String
+  slug               String               @unique
+  description        String               @default("")
+  startAt            DateTime?
+  endAt              DateTime?
+  timezone           String               @default("America/Argentina/Mendoza")
+  city               String?
+  country            String?
+  status             EventStatus          @default(DRAFT)
+  capacity           Int                  @default(0)
+  objectiveAttendees Int                  @default(0)
+  budgetCents        Int                  @default(0)
+  healthScore        Int                  @default(0)
+  branding           Json?
+  configuration      Json?
+  objectives         Json?
+  metadata           Json?
+  abraCheckoutEvent  String?
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime             @updatedAt
+  organization       Organization         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  members            EventMember[]
+  entityAccess       EntityAccess[]
+  invitations        Invitation[]
+  tasks              Task[]
+  venue              Venue?
+  publicPage         PublicPage?
+  incidents          Incident[]
+  runOfShow          RunOfShowItem[]
+  deals              SponsorDeal[]
+  speakers           Speaker[]
+  vendors            Vendor[]
+  attendees          Attendee[]
+  stages             Stage[]
+  programSessions    ProgramSession[]
+  auditLogs          AuditLog[]
+  campaigns          Campaign[]
+  expenses           Expense[]
+  revenues           Revenue[]
+  categories         BudgetCategory[]
+  invoices           Invoice[]
+  payments           Payment[]
+  ticketTypes        TicketType[]
+  orders             TicketOrder[]
+  tickets            Ticket[]
+  shifts             Shift[]
+  notifications      Notification[]
+  connectionRequests ConnectionRequest[]
+  meetings           Meeting[]
+  polls              Poll[]
+  questions          Question[]
+  surveys            Survey[]
+  surveyResponses    SurveyResponse[]
+  points             GamificationPoint[]
+  ticketing          TicketingConnection?
+}
+
+model PublicPage {
+  id           String  @id
+  eventId      String  @unique
+  headline     String?
+  subheadline  String?
+  description  String?
+  heroImageUrl String?
+  logoUrl      String?
+  ctaLabel     String?
+  ctaUrl       String?
+  event        Event   @relation(fields: [eventId], references: [id], onDelete: Cascade)
+}
+
+model Venue {
+  id      String       @id
+  eventId String       @unique
+  name    String
+  address String       @default("")
+  notes   String       @default("")
+  event   Event        @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  spaces  VenueSpace[]
+}
+
+model VenueSpace {
+  id       String @id
+  venueId  String
+  name     String
+  capacity Int    @default(0)
+  kind     String @default("room")
+  venue    Venue  @relation(fields: [venueId], references: [id], onDelete: Cascade)
+}
+
+model Stage {
+  id       String    @id
+  eventId  String
+  name     String
+  event    Event            @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  sessions ProgramSession[]
+
+  @@index([eventId])
+}
+
+model Task {
+  id             String           @id
+  eventId        String
+  parentId       String?
+  title          String
+  description    String           @default("")
+  status         String           @default("TODO")
+  priority       String           @default("MEDIUM")
+  assigneeId     String?
+  dueAt          DateTime?
+  checklist      Json             @default("[]")
+  approvalStatus String?
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+  event          Event            @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  parent         Task?            @relation("Subtasks", fields: [parentId], references: [id])
+  children       Task[]           @relation("Subtasks")
+  blockedBy      TaskDependency[] @relation("BlockedTask")
+  blocking       TaskDependency[] @relation("BlockingTask")
+  comments       Comment[]
+
+  @@index([eventId])
+}
+
+model TaskDependency {
+  id          String @id
+  eventId     String
+  taskId      String
+  dependsOnId String
+  task        Task   @relation("BlockedTask", fields: [taskId], references: [id], onDelete: Cascade)
+  dependsOn   Task   @relation("BlockingTask", fields: [dependsOnId], references: [id], onDelete: Cascade)
+
+  @@unique([taskId, dependsOnId])
+  @@index([eventId])
+}
+
+model Comment {
+  id        String   @id
+  eventId   String
+  taskId    String
+  authorId  String
+  body      String
+  createdAt DateTime @default(now())
+  task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@index([eventId])
+}
+
+model SponsorDeal {
+  id           String               @id
+  eventId      String
+  companyName  String
+  tier         String               @default("SILVER")
+  status       String               @default("PROSPECT")
+  contactEmail String               @default("")
+  amountCents  Int                  @default(0)
+  notes        String               @default("")
+  event        Event                @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  deliverables SponsorDeliverable[]
+
+  @@index([eventId])
+}
+
+model SponsorDeliverable {
+  id     String      @id
+  dealId String
+  title  String
+  status String      @default("pending")
+  dueAt  DateTime?
+  deal   SponsorDeal @relation(fields: [dealId], references: [id], onDelete: Cascade)
+}
+
+model Speaker {
+  id         String           @id
+  eventId    String
+  personName String
+  email      String           @default("")
+  company    String           @default("")
+  bio        String           @default("")
+  status     String           @default("INVITED")
+  topics     String[]         @default([])
+  event      Event            @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  sessions   SessionSpeaker[]
+
+  @@index([eventId])
+}
+
+model ProgramSession {
+  id          String           @id
+  eventId     String
+  title       String
+  description String           @default("")
+  startAt     DateTime?
+  endAt       DateTime?
+  type        String           @default("Sesión")
+  status      String           @default("CONFIRMED")
+  stageId     String?
+  roomId      String?
+  event       Event            @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  stage       Stage?           @relation(fields: [stageId], references: [id])
+  speakers    SessionSpeaker[]
+
+  @@index([eventId])
+}
+
+model SessionSpeaker {
+  id        String  @id
+  sessionId String
+  speakerId String
+  session   ProgramSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  speaker   Speaker @relation(fields: [speakerId], references: [id], onDelete: Cascade)
+
+  @@unique([sessionId, speakerId])
+}
+
+model Vendor {
+  id           String @id
+  eventId      String
+  name         String
+  category     String @default("")
+  amountCents  Int    @default(0)
+  contactEmail String @default("")
+  status       String @default("PROSPECT")
+  notes        String @default("")
+  event        Event  @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@index([eventId])
+}
+
+model Attendee {
+  id        String            @id
+  eventId   String
+  name      String
+  email     String            @default("")
+  company   String            @default("")
+  title     String            @default("")
+  interests String[]          @default([])
+  goals     String[]          @default([])
+  tags      String[]          @default([])
+  userId    String?
+  event     Event             @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  sessions  AttendeeSession[]
+
+  @@index([eventId])
+}
+
+model AttendeeSession {
+  id         String    @id @default(cuid())
+  attendeeId String
+  tokenHash  String    @unique
+  expiresAt  DateTime
+  revokedAt  DateTime?
+  createdAt  DateTime  @default(now())
+  attendee   Attendee  @relation(fields: [attendeeId], references: [id], onDelete: Cascade)
+}
+
+model Incident {
+  id          String    @id
+  eventId     String
+  title       String
+  description String    @default("")
+  status      String    @default("open")
+  severity    String    @default("medium")
+  zoneId      String?
+  assigneeId  String?
+  createdAt   DateTime  @default(now())
+  resolvedAt  DateTime?
+  event       Event     @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@index([eventId])
+}
+
+model RunOfShowItem {
+  id              String    @id
+  eventId         String
+  title           String
+  startAt         DateTime?
+  endAt           DateTime?
+  area            String    @default("")
+  location        String    @default("")
+  stageId         String?
+  ownerId         String?
+  status          String    @default("planned")
+  critical        Boolean   @default(false)
+  notes           String    @default("")
+  dependsOnTaskId String?
+  event           Event     @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@index([eventId])
+}
+
+model Campaign {
+  id          String @id
+  eventId     String
+  name        String
+  channel     String @default("")
+  budgetCents Int    @default(0)
+  status      String @default("DRAFT")
+  event       Event  @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@index([eventId])
+}
+
+model Expense {
+  id          String   @id
+  eventId     String
+  categoryId  String?
+  vendorId    String?
+  description String
+  amountCents Int
+  status      String   @default("PLANNED")
+  direct      Boolean  @default(false)
+  incurredAt  DateTime @default(now())
+  event       Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@index([eventId])
+}
+
+model Revenue {
+  id          String   @id
+  eventId     String
+  type        String
+  description String   @default("")
+  amountCents Int
+  sponsorId   String?
+  receivedAt  DateTime @default(now())
+  event       Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@index([eventId])
+}
+
+model BudgetCategory {
+  id           String @id
+  eventId      String
+  name         String
+  plannedCents Int    @default(0)
+  kind         String
+  event        Event  @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@index([eventId])
+}
+
+model Invoice {
+  id          String   @id
+  eventId     String
+  sponsorId   String?
+  number      String
+  amountCents Int
+  status      String
+  dueAt       DateTime
+  event       Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@index([eventId])
+}
+
+model Payment {
+  id          String    @id
+  eventId     String
+  invoiceId   String?
+  amountCents Int
+  method      String
+  status      String
+  paidAt      DateTime?
+  event       Event     @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@index([eventId])
+}
+
+model TicketType {
+  id         String  @id
+  eventId    String
+  name       String
+  priceCents Int
+  quantity   Int
+  externalId String?
+  event      Event   @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@index([eventId])
+}
+
+model TicketOrder {
+  id         String   @id
+  eventId    String
+  attendeeId String?
+  externalId String?
+  status     String
+  totalCents Int
+  buyerName  String   @default("")
+  buyerEmail String   @default("")
+  createdAt  DateTime @default(now())
+  event      Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  tickets    Ticket[]
+
+  @@index([eventId])
+}
+
+model Ticket {
+  id          String      @id
+  eventId     String
+  orderId     String
+  attendeeId  String?
+  typeId      String
+  status      String
+  code        String
+  checkedInAt DateTime?
+  event       Event       @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  order       TicketOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([eventId])
+}
+
+model Shift {
+  id        String   @id
+  eventId   String
+  userId    String
+  roleLabel String
+  location  String
+  startAt   DateTime
+  endAt     DateTime
+  notes     String   @default("")
+  event     Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@index([eventId])
+}
+
+model Notification {
+  id         String    @id
+  eventId    String
+  userId     String
+  type       String
+  title      String
+  body       String
+  readAt     DateTime?
+  createdAt  DateTime  @default(now())
+  entityType String?
+  entityId   String?
+  event      Event     @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@index([eventId, userId])
+}
+
+model ConnectionRequest {
+  id             String   @id
+  eventId        String
+  fromAttendeeId String
+  toAttendeeId   String
+  status         String
+  createdAt      DateTime @default(now())
+  event          Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@index([eventId])
+}
+
+model Meeting {
+  id          String   @id
+  eventId     String
+  attendeeAId String
+  attendeeBId String
+  startAt     DateTime
+  endAt       DateTime
+  location    String
+  status      String
+  event       Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@index([eventId])
+}
+
+model Poll {
+  id        String     @id
+  eventId   String
+  sessionId String?
+  question  String
+  options   String[]
+  status    String
+  event     Event      @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  votes     PollVote[]
+
+  @@index([eventId])
+}
+
+model PollVote {
+  id          String @id
+  eventId     String
+  pollId      String
+  attendeeId  String
+  optionIndex Int
+  poll        Poll   @relation(fields: [pollId], references: [id], onDelete: Cascade)
+
+  @@unique([pollId, attendeeId])
+}
+
+model Question {
+  id         String   @id
+  eventId    String
+  sessionId  String?
+  attendeeId String
+  body       String
+  upvotes    Int      @default(0)
+  answered   Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  event      Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@index([eventId])
+}
+
+model Survey {
+  id        String   @id
+  eventId   String
+  title     String
+  questions String[]
+  event     Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@index([eventId])
+}
+
+model SurveyResponse {
+  id         String   @id
+  eventId    String
+  surveyId   String
+  attendeeId String
+  answers    String[]
+  event      Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@index([eventId])
+}
+
+model GamificationPoint {
+  id         String   @id
+  eventId    String
+  attendeeId String
+  reason     String
+  points     Int
+  createdAt  DateTime @default(now())
+  event      Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@index([eventId])
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  eventId   String?
+  actorId   String?
+  action    String
+  entityType String
+  entityId  String
+  metadata  Json?
+  createdAt DateTime @default(now())
+  event     Event?   @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  actor     User?    @relation(fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([eventId])
+}
+
+model TicketingConnection {
+  id              String    @id
+  eventId         String    @unique
+  provider        String
+  status          String
+  externalEventId String?
+  lastSyncAt      DateTime?
+  lastError       String?
+  event           Event     @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  logs            SyncLog[]
+}
+
+model SyncLog {
+  id           String              @id
+  eventId      String
+  connectionId String
+  direction    String
+  status       String
+  message      String
+  attempt      Int                 @default(1)
+  createdAt    DateTime            @default(now())
+  connection   TicketingConnection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+
+  @@index([eventId])
+}
+
+model WebhookEvent {
+  id             String   @id
+  eventId        String?
+  provider       String
+  signatureValid Boolean
+  payload        Json
+  status         String
+  createdAt      DateTime @default(now())
+}
+
+model Job {
+  id             String   @id
+  eventId        String?
+  organizationId String?
+  type           String
+  payload        Json
+  status         String
+  runAt          DateTime
+  attempts       Int      @default(0)
+  lastError      String?
+  createdAt      DateTime @default(now())
+}
+
+model OutboundEmail {
+  id        String   @id
+  eventId   String?
+  toAddress String
+  subject   String
+  body      String
+  createdAt DateTime @default(now())
+}
+
+model LoginFailure {
+  id String   @id
+  key String
+  at DateTime @default(now())
+}
