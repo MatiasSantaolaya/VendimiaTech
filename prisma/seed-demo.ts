@@ -161,14 +161,126 @@ async function main() {
     };
     await prisma.payment.upsert({ where: { id: row.id }, update: fields, create: { id: row.id, ...fields } });
   }
-  const [tasks, incidents, sponsors, expenses] = await Promise.all([
+  for (const row of data.stages) {
+    await prisma.stage.upsert({ where: { id: row.id }, update: { name: row.name, eventId: row.eventId }, create: row });
+  }
+  for (const row of data.speakers) {
+    const fields = {
+      eventId: row.eventId,
+      personName: row.personName,
+      email: row.email,
+      company: row.company,
+      bio: row.bio,
+      status: row.status,
+      topics: row.topics,
+    };
+    await prisma.speaker.upsert({ where: { id: row.id }, update: fields, create: { id: row.id, ...fields } });
+  }
+  for (const row of data.sessionsProgram) {
+    const fields = {
+      eventId: row.eventId,
+      title: row.title,
+      description: row.description,
+      startAt: at(row.startAt),
+      endAt: at(row.endAt),
+      type: row.type,
+      status: row.status,
+      stageId: row.stageId,
+      roomId: row.roomId,
+    };
+    await prisma.programSession.upsert({ where: { id: row.id }, update: fields, create: { id: row.id, ...fields } });
+    for (const speakerId of row.speakerIds) {
+      await prisma.sessionSpeaker.upsert({
+        where: { sessionId_speakerId: { sessionId: row.id, speakerId } },
+        update: {},
+        create: { id: `ss_${row.id}_${speakerId}`, sessionId: row.id, speakerId },
+      });
+    }
+  }
+  for (const row of data.vendors) {
+    await prisma.vendor.upsert({ where: { id: row.id }, update: row, create: row });
+  }
+  for (const row of data.runOfShow) {
+    const fields = {
+      eventId: row.eventId,
+      title: row.title,
+      startAt: at(row.startAt),
+      endAt: at(row.endAt),
+      area: row.area,
+      location: row.location,
+      stageId: row.stageId,
+      ownerId: row.ownerId,
+      status: row.status,
+      critical: row.critical,
+      notes: row.notes,
+      dependsOnTaskId: row.dependsOnTaskId,
+    };
+    await prisma.runOfShowItem.upsert({ where: { id: row.id }, update: fields, create: { id: row.id, ...fields } });
+  }
+  for (const row of data.ticketTypes) {
+    await prisma.ticketType.upsert({ where: { id: row.id }, update: row, create: row });
+  }
+  for (const row of data.orders) {
+    const fields = {
+      eventId: row.eventId,
+      attendeeId: row.attendeeId,
+      externalId: row.externalId,
+      status: row.status,
+      totalCents: row.totalCents,
+      buyerName: row.buyerName,
+      buyerEmail: row.buyerEmail,
+      createdAt: new Date(row.createdAt),
+    };
+    await prisma.ticketOrder.upsert({ where: { id: row.id }, update: fields, create: { id: row.id, ...fields } });
+  }
+  for (const row of data.attendees) {
+    const fields = {
+      eventId: row.eventId,
+      name: row.name,
+      email: row.email,
+      company: row.company,
+      title: row.title,
+      interests: row.interests,
+      goals: row.goals,
+      tags: row.tags,
+      userId: row.userId,
+    };
+    await prisma.attendee.upsert({ where: { id: row.id }, update: fields, create: { id: row.id, ...fields } });
+  }
+  for (const row of data.tickets) {
+    const fields = {
+      eventId: row.eventId,
+      orderId: row.orderId,
+      attendeeId: row.attendeeId,
+      typeId: row.typeId,
+      status: row.status,
+      code: row.code,
+      checkedInAt: at(row.checkedInAt),
+    };
+    await prisma.ticket.upsert({ where: { id: row.id }, update: fields, create: { id: row.id, ...fields } });
+  }
+  for (const row of data.attendeeSessions) {
+    const fields = {
+      attendeeId: row.attendeeId,
+      tokenHash: row.tokenHash,
+      expiresAt: new Date(row.expiresAt),
+      revokedAt: at(row.revokedAt),
+    };
+    await prisma.attendeeSession.upsert({ where: { id: row.id }, update: fields, create: { id: row.id, ...fields } });
+  }
+  const [tasks, incidents, sponsors, expenses, tickets, sessions, vendors, speakers, runOfShow] = await Promise.all([
     prisma.task.count(),
     prisma.incident.count(),
     prisma.sponsorDeal.count(),
     prisma.expense.count(),
+    prisma.ticket.count(),
+    prisma.programSession.count(),
+    prisma.vendor.count(),
+    prisma.speaker.count(),
+    prisma.runOfShowItem.count(),
   ]);
   console.log("Demo fixture upserted for", data.events.map((event) => event.slug).join(", "));
-  console.log(`Rows: tasks=${tasks} incidents=${incidents} sponsors=${sponsors} expenses=${expenses}`);
+  console.log(`Rows: tasks=${tasks} incidents=${incidents} sponsors=${sponsors} expenses=${expenses} tickets=${tickets} sessions=${sessions} vendors=${vendors} speakers=${speakers} runOfShow=${runOfShow}`);
 }
 
 main().finally(() => prisma.$disconnect());

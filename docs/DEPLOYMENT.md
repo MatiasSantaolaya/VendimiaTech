@@ -47,7 +47,7 @@ The only migration in the tree is `prisma/migrations/20261006153000_init`. It wa
 
 `npm run db:seed` upserts one owner when the `SEED_*` variables are set. Otherwise it prints a no-op. It does not load Vendimia Tech. That production seed was not run here.
 
-`npm run db:seed:demo` upserts organizations, users, memberships, events, tasks, incidents, sponsor deals, deliverables, and finance rows (expenses, revenues, invoices, payments). It does not load tickets or program sessions. `/demo` still uses the memory store.
+`npm run db:seed:demo` upserts organizations, users, memberships, events, tasks, incidents, sponsor deals, deliverables, finance rows, tickets, program sessions, vendors, speakers, run-of-show rows, attendees, and the demo magic-link session. `/demo` still uses the memory store.
 
 ## Docker
 
