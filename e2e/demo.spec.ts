@@ -1,5 +1,14 @@
 import { expect, test } from "@playwright/test";
 
+test("login reaches the command center", async ({ page }) => {
+  await page.goto("/login");
+  await page.getByTestId("email").fill("ana.organizer@vendimiatech.demo");
+  await page.getByTestId("password").fill("vendimia-demo");
+  await page.getByTestId("login-submit").click();
+  await expect(page.getByTestId("command-center")).toBeVisible();
+  await expect(page.getByTestId("health-score")).toBeVisible();
+});
+
 test("organizer demo covers command, task, incident, portals, ticketing, and AI", async ({ page }) => {
   await page.goto("/demo");
   await expect(page.getByTestId("command-center")).toBeVisible();

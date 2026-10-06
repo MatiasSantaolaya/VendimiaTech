@@ -17,5 +17,6 @@ export default defineConfig({
     url: "http://localhost:3000/login",
     reuseExistingServer: false,
     timeout: 120_000,
+    env: Object.fromEntries(Object.entries(process.env).filter((entry): entry is [string, string] => typeof entry[1] === "string" && entry[0] !== "DATABASE_URL")),
   },
 });

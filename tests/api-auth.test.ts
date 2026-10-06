@@ -6,6 +6,7 @@ import { createHmac } from "node:crypto";
 import { MOCK_WEBHOOK_SECRET } from "@/lib/ticketing/mock";
 
 beforeEach(() => {
+  delete process.env.DATABASE_URL;
   resetDemoStore();
 });
 
@@ -41,6 +42,8 @@ describe("auth and tenancy", () => {
     const { response, session } = await login("ana.organizer@vendimiatech.demo");
     expect(response.status).toBe(200);
     expect(session).toBeTruthy();
+    const demoCookie = (response.headers.getSetCookie?.() ?? []).find((cookie) => cookie.startsWith("plane_demo="));
+    expect(demoCookie?.startsWith("plane_demo=1")).toBe(true);
   });
 
   it("denies the other organization", async () => {
