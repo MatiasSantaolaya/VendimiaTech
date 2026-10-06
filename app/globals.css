@@ -46,6 +46,9 @@ a { color: inherit; }
 .health { width: 92px; height: 92px; border-radius: 50%; display: grid; place-items: center; background: conic-gradient(var(--olive) calc(var(--p) * 1%), #e7dcc8 0); }
 .health span { width: 68px; height: 68px; border-radius: 50%; background: var(--card); display: grid; place-items: center; font-family: Palatino, Georgia, serif; }
 .muted { color: #6d6258; }
+.calendar { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; }
+.calendar-head, .calendar-day { min-width: 0; min-height: 28px; font-size: 12px; overflow-wrap: anywhere; }
+.calendar-day { background: #f7f1e6; border-radius: 8px; padding: 4px; min-height: 48px; }
 .kanban { display: grid; grid-template-columns: repeat(5, minmax(140px, 1fr)); gap: 8px; }
 .col { background: #f7f1e6; border-radius: 12px; padding: 8px; min-height: 120px; }
 .empty { padding: 24px; border: 1px dashed var(--line); border-radius: 16px; }

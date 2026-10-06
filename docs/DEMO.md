@@ -44,7 +44,7 @@ A second organization, Bodega Sur Eventos (`cata-bodega-sur`, `evt_bodega`), exi
 
 `usr_snoop` (`rio@sponsors.demo`) is an attendee with the Río sponsor contact email and no sponsor entity access.
 
-Invitation token `demo-invite-token` (email `nuevo.staff@vendimiatech.demo`, role `STAFF`, expires 2027-03-01). Magic token `demo-magic-ines` is stored for the uploaded attendee-session helper. The demo UI does not redeem it.
+Invitation token `demo-invite-token` (email `nuevo.staff@vendimiatech.demo`, role `STAFF`, expires 2027-03-01). Magic token `demo-magic-ines` is redeemed on `/attendee/evt_vendimia`. That screen posts `POST /api/auth/attendee` and does not send email.
 
 ## What the Playwright test did
 

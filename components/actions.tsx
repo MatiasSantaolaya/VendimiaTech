@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { DEMO_PERSONAS } from "@/lib/demo/build";
 
@@ -21,7 +21,8 @@ async function send(path: string, body?: unknown) {
 }
 
 export function DemoBar({ userId, eventSlug }: { userId: string; eventSlug: string }) {
-  const router = useRouter();
+  const [ready, setReady] = useState(false);
+  useEffect(() => setReady(true), []);
   const homes: Record<string, string> = {
     usr_ana: "control-center",
     usr_diego: "operations",
@@ -31,18 +32,24 @@ export function DemoBar({ userId, eventSlug }: { userId: string; eventSlug: stri
     usr_ines: "experience",
   };
   return (
-    <form className="demo-bar" data-testid="demo-bar">
+    <div className="demo-bar" data-testid="demo-bar">
       <span>Demo Vendimia Tech</span>
       <label>
         Ver como
         <select
           data-testid="view-as"
+          disabled={!ready}
           value={userId}
           onChange={async (event) => {
             const next = event.target.value;
-            await send("/api/demo/view-as", { userId: next });
-            router.push(`/events/${eventSlug}/${homes[next] || "control-center"}`);
-            router.refresh();
+            try {
+              await send("/api/demo/view-as", { userId: next });
+              // Task and incident actions reload the document, so a client router push can stay on the old module.
+              // eslint-disable-next-line @next/next/no-location-assign-relative-destination
+              window.location.assign(`/events/${eventSlug}/${homes[next] || "control-center"}`);
+            } catch (cause) {
+              console.error(cause instanceof Error ? cause.message : "No se pudo cambiar el perfil");
+            }
           }}
         >
           {DEMO_PERSONAS.map((row) => (
@@ -50,6 +57,34 @@ export function DemoBar({ userId, eventSlug }: { userId: string; eventSlug: stri
           ))}
         </select>
       </label>
+    </div>
+  );
+}
+
+export function MagicLinkForm({ eventId }: { eventId: string }) {
+  const router = useRouter();
+  const [token, setToken] = useState("");
+  const [error, setError] = useState("");
+  return (
+    <form
+      className="stack"
+      data-testid="magic-link-form"
+      onSubmit={async (event) => {
+        event.preventDefault();
+        setError("");
+        try {
+          await send("/api/auth/attendee", { token, eventId });
+          router.refresh();
+        } catch (cause) {
+          setError(cause instanceof Error ? cause.message : "No se pudo entrar");
+        }
+      }}
+    >
+      <h1>Enlace de asistente</h1>
+      <p className="muted">Pegá el enlace mágico del evento. En la demo es demo-magic-ines.</p>
+      <input className="input" data-testid="magic-token" value={token} onChange={(event) => setToken(event.target.value)} autoComplete="off" />
+      <button className="btn primary" type="submit">Entrar</button>
+      {error ? <p>{error}</p> : null}
     </form>
   );
 }
@@ -58,6 +93,7 @@ export function TaskActions({ eventId, taskId, status }: { eventId: string; task
   if (status === "DONE" || status === "CANCELLED") return <span className="pill">{status === "DONE" ? "Hecha" : "Cancelada"}</span>;
   return (
     <button
+      type="button"
       className="btn"
       data-testid="task-complete"
       onClick={async () => {
@@ -74,6 +110,7 @@ export function IncidentActions({ eventId, incidentId, status }: { eventId: stri
   if (status === "resolved" || status === "closed") return <span className="pill">Resuelto</span>;
   return (
     <button
+      type="button"
       className="btn"
       data-testid="incident-resolve"
       onClick={async () => {

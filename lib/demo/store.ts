@@ -28,6 +28,30 @@ export function actorFor(state: DemoState, userId: string): Actor | null {
   };
 }
 
+export function attendeeFromToken(state: DemoState, token: string | null) {
+  if (!token) return null;
+  const session = state.attendeeSessions.find((row) => row.tokenHash === sha256(token) && !row.revokedAt && new Date(row.expiresAt).getTime() > Date.now());
+  if (!session) return null;
+  return state.attendees.find((row) => row.id === session.attendeeId) ?? null;
+}
+
+export function redeemMagicToken(state: DemoState, token: string, eventId: string) {
+  const session = state.attendeeSessions.find((row) => row.tokenHash === sha256(token));
+  if (!session || session.revokedAt || new Date(session.expiresAt).getTime() <= Date.now()) return null;
+  const attendee = state.attendees.find((row) => row.id === session.attendeeId);
+  if (!attendee || attendee.eventId !== eventId) return null;
+  session.revokedAt = new Date().toISOString();
+  const raw = newSecret();
+  state.attendeeSessions.push({
+    id: createId("as"),
+    attendeeId: attendee.id,
+    tokenHash: sha256(raw),
+    expiresAt: new Date(Date.now() + 14 * 864e5).toISOString(),
+    revokedAt: null,
+  });
+  return { raw, attendee };
+}
+
 export function actorFromToken(state: DemoState, token: string | null) {
   if (!token) return null;
   const session = state.sessions.find((row) => row.tokenHash === sha256(token) && !row.revokedAt && new Date(row.expiresAt).getTime() > Date.now());

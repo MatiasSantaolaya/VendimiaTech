@@ -3,7 +3,7 @@ import { answerQuestion } from "@/lib/domain/brain";
 import { toCsv } from "@/lib/domain/csv";
 import { EVENT_SLUG } from "@/lib/demo/build";
 import type { Actor } from "@/lib/domain/rbac";
-import { acceptInvite, actorFromToken, createModule, financeFor, getDemoState, loginDemo, openSession, patchIncident, patchTask, requireEvent, revokeToken, runJobs, viewAs } from "@/lib/demo/store";
+import { acceptInvite, actorFromToken, createModule, financeFor, getDemoState, loginDemo, openSession, patchIncident, patchTask, redeemMagicToken, requireEvent, revokeToken, runJobs, viewAs } from "@/lib/demo/store";
 import { buildEventView } from "@/lib/server/view";
 import { abraTickets } from "@/lib/ticketing/abra";
 import { verifyMockSignature } from "@/lib/ticketing/mock";
@@ -52,6 +52,7 @@ export async function handleApi(request: Request) {
     }
     if (!demo) return handleDatabaseApi(request, parts, method);
     const state = getDemoState();
+    if (parts[0] === "auth" && parts[1] === "attendee" && method === "POST") return demoAttendeeSignIn(request, state);
     const token = readCookie(request, "plane_session");
     const current = actorFromToken(state, token);
     if (parts[0] === "auth" && parts[1] === "logout" && method === "POST") {
@@ -89,6 +90,13 @@ async function login(request: Request, state: ReturnType<typeof getDemoState>, i
   if (!result.ok) return json(result.status, { error: { code: result.status === 429 ? "RATE_LIMIT" : "INVALID_LOGIN", message: result.error } });
   const event = state.events.find((row) => row.organizationId === "org_vendimia") ?? state.events[0];
   return withCookies(json(200, { ok: true, slug: event?.slug ?? EVENT_SLUG, demo: true }), authCookieList(request, result.token, result.csrfToken, true));
+}
+
+async function demoAttendeeSignIn(request: Request, state: ReturnType<typeof getDemoState>) {
+  const body = z.object({ token: z.string().min(4), eventId: z.string().min(1) }).parse(await request.json());
+  const redeemed = redeemMagicToken(state, body.token, body.eventId);
+  if (!redeemed) return json(400, { error: { code: "ATTENDEE", message: "El enlace no es válido." } });
+  return withCookies(json(200, { ok: true }), [cookieHeader("plane_attendee_session", redeemed.raw, request, true)]);
 }
 
 async function accept(request: Request, state: ReturnType<typeof getDemoState>) {

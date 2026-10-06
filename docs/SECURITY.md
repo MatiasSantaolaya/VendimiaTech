@@ -4,7 +4,7 @@
 
 Organizer sessions use cookie `plane_session` (HttpOnly, SameSite=Lax, 14 days). The CSRF token is `plane_csrf` and is readable by the page so the client can send `x-csrf-token`. `plane_demo` marks a demo session. Cookies are `Secure` only when `NODE_ENV=production` and the request is HTTPS, so local HTTP tests can log in.
 
-Attendee magic links are a separate cookie, `plane_attendee_session`, implemented in the uploaded `lib/services/attendee-auth.ts`. The demo page does not call that helper. The demo attendee persona is a normal user session (`usr_ines`) plus `EntityAccess` for `att_ines`.
+Attendee magic links are a separate cookie, `plane_attendee_session`. `/attendee/[eventId]` posts the token to `POST /api/auth/attendee`. With a database, that calls `signInWithMagicToken`. In demo mode the memory store redeems the same fixture token. The view-as attendee persona is still a normal user session (`usr_ines`) plus `EntityAccess` for `att_ines`.
 
 Passwords in the demo store are scrypt hashes (`lib/domain/password.ts`), not plaintext.
 

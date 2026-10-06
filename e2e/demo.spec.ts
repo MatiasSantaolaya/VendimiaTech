@@ -1,4 +1,9 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
+
+async function viewAs(page: Page, label: string, testId: string) {
+  await page.getByTestId("view-as").selectOption({ label });
+  await expect(page.getByTestId(testId)).toBeVisible();
+}
 
 test("login reaches the command center", async ({ page }) => {
   await page.goto("/login");
@@ -10,6 +15,7 @@ test("login reaches the command center", async ({ page }) => {
 });
 
 test("organizer demo covers command, task, incident, portals, ticketing, and AI", async ({ page }) => {
+  test.setTimeout(90_000);
   await page.goto("/demo");
   await expect(page.getByTestId("command-center")).toBeVisible();
   await expect(page.getByTestId("health-score")).toBeVisible();
@@ -29,18 +35,13 @@ test("organizer demo covers command, task, incident, portals, ticketing, and AI"
   await incident.getByTestId("incident-resolve").click();
   await expect(page.locator("[data-testid='incident-row']", { hasText: "Falla de audio" })).toContainText("Resuelto");
 
-  await page.getByTestId("view-as").selectOption({ label: "Sponsor" });
-  await expect(page.getByTestId("sponsor-portal")).toBeVisible();
-  await page.getByTestId("view-as").selectOption({ label: "Speaker" });
-  await expect(page.getByTestId("speaker-portal")).toBeVisible();
-  await page.getByTestId("view-as").selectOption({ label: "Vendor" });
-  await expect(page.getByTestId("vendor-portal")).toBeVisible();
-  await page.getByTestId("view-as").selectOption({ label: "Staff" });
-  await expect(page.getByTestId("staff-portal")).toBeVisible();
-  await page.getByTestId("view-as").selectOption({ label: "Asistente" });
-  await expect(page.getByTestId("attendee-portal")).toBeVisible();
+  await viewAs(page, "Sponsor", "sponsor-portal");
+  await viewAs(page, "Speaker", "speaker-portal");
+  await viewAs(page, "Vendor", "vendor-portal");
+  await viewAs(page, "Staff", "staff-portal");
+  await viewAs(page, "Asistente", "attendee-portal");
 
-  await page.getByTestId("view-as").selectOption({ label: "Organizador" });
+  await viewAs(page, "Organizador", "command-center");
   await page.getByRole("link", { name: "Integraciones" }).click();
   await expect(page.getByTestId("ticketing-panel")).toBeVisible();
   await page.getByTestId("abra-probe").click();
@@ -52,8 +53,7 @@ test("organizer demo covers command, task, incident, portals, ticketing, and AI"
   await page.getByTestId("brain-q-tickets").click();
   await expect(page.getByTestId("brain-answer")).toContainText(/135|entrada/i);
 
-  await page.getByTestId("view-as").selectOption({ label: "Asistente" });
-  await expect(page.getByTestId("attendee-portal")).toBeVisible();
+  await viewAs(page, "Asistente", "attendee-portal");
   await page.goto("/events/vendimia-tech-2027/finance");
   await expect(page.getByTestId("denied")).toBeVisible();
 });

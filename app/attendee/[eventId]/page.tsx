@@ -1,8 +1,9 @@
 import Link from "next/link";
 import { cookies } from "next/headers";
+import { MagicLinkForm } from "@/components/actions";
 import { Experience } from "@/components/EventScreens";
 import { findActiveSession } from "@/lib/auth";
-import { actorFromToken, getDemoState } from "@/lib/demo/store";
+import { actorFromToken, attendeeFromToken, getDemoState } from "@/lib/demo/store";
 import type { Actor } from "@/lib/domain/rbac";
 import { getCurrentAttendee } from "@/lib/services/attendee-auth";
 import { getEventAccess } from "@/lib/services/event-access";
@@ -18,10 +19,31 @@ export default async function AttendeePage({ params }: { params: Promise<{ event
   const jar = await cookies();
   if (isDemoMode(jar.get("plane_demo")?.value)) {
     const state = getDemoState();
+    const event = state.events.find((row) => row.id === eventId);
+    const magic = attendeeFromToken(state, jar.get("plane_attendee_session")?.value ?? null);
+    if (event && magic && magic.eventId === eventId) {
+      const actor: Actor = {
+        userId: magic.userId || magic.id,
+        email: magic.email,
+        name: magic.name,
+        memberships: [],
+        eventRoles: [{ eventId, role: "ATTENDEE" }],
+        access: [{ eventId, role: "ATTENDEE", entityType: "ATTENDEE", entityId: magic.id }],
+      };
+      const view = buildEventView(state, actor, event.id);
+      if (!view || view.forbidden) return <main className="hero">Sin acceso</main>;
+      return <main className="hero"><Experience view={view} /><p><Link href={`/events/${event.slug}/experience`}>Volver al evento</Link></p></main>;
+    }
     const token = jar.get("plane_session")?.value ?? null;
     const current = actorFromToken(state, token);
-    const event = state.events.find((row) => row.id === eventId);
-    if (!event || !current) return <main className="hero"><h1>Entrá a la demo</h1><Link href="/demo">Demo</Link></main>;
+    if (!event || !current) {
+      return (
+        <main className="hero">
+          <MagicLinkForm eventId={eventId} />
+          <p><Link href="/demo">Demo</Link></p>
+        </main>
+      );
+    }
     const view = buildEventView(state, current.actor, event.id);
     if (!view || view.forbidden) return <main className="hero">Sin acceso</main>;
     return <main className="hero"><Experience view={view} /><p><Link href={`/events/${event.slug}/experience`}>Volver al evento</Link></p></main>;
@@ -29,7 +51,12 @@ export default async function AttendeePage({ params }: { params: Promise<{ event
   const attendee = await getCurrentAttendee();
   const session = await findActiveSession(jar.get("plane_session")?.value);
   if (!session && !(attendee && attendee.eventId === eventId)) {
-    return <main className="hero"><h1>Entrá como asistente</h1><Link href="/login">Entrar</Link></main>;
+    return (
+      <main className="hero">
+        <MagicLinkForm eventId={eventId} />
+        <p><Link href="/login">Entrar con usuario</Link></p>
+      </main>
+    );
   }
   const userId = session?.user.id ?? attendee?.userId ?? null;
   const access = userId ? await getEventAccess(eventId, userId) : null;

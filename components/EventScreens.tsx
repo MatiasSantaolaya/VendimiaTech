@@ -89,7 +89,52 @@ export function Planning({ view }: { view: Dash }) {
         <h3>Línea de tiempo</h3>
         {view.tasks.filter((task) => task.dueAt).sort((a, b) => String(a.dueAt).localeCompare(String(b.dueAt))).map((task) => <div key={task.id}>{task.dueAt} · {task.title}</div>)}
       </div>
+      <PlanningCalendar tasks={view.tasks} />
     </div>
+  );
+}
+
+const WEEKDAYS = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
+const MONTHS = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
+
+function PlanningCalendar({ tasks }: { tasks: Dash["tasks"] }) {
+  const dated = tasks.filter((task) => task.dueAt);
+  const byDay = new Map<string, Dash["tasks"]>();
+  for (const task of dated) {
+    const day = String(task.dueAt).slice(0, 10);
+    const list = byDay.get(day) ?? [];
+    list.push(task);
+    byDay.set(day, list);
+  }
+  const months = [...new Set(dated.map((task) => String(task.dueAt).slice(0, 7)))].sort();
+  const undated = tasks.filter((task) => !task.dueAt);
+  return (
+    <section className="stack" data-testid="planning-calendar">
+      <h3>Calendario</h3>
+      {months.length === 0 ? <p className="empty">No hay tareas con fecha.</p> : months.map((month) => {
+        const [year, monthNumber] = month.split("-").map(Number);
+        const first = new Date(Date.UTC(year, monthNumber - 1, 1));
+        const pad = (first.getUTCDay() + 6) % 7;
+        const count = new Date(Date.UTC(year, monthNumber, 0)).getUTCDate();
+        const cells: (string | null)[] = Array.from({ length: pad }, () => null);
+        for (let day = 1; day <= count; day += 1) cells.push(`${month}-${String(day).padStart(2, "0")}`);
+        return (
+          <div className="card" key={month}>
+            <h3>{MONTHS[monthNumber - 1]} {year}</h3>
+            <div className="calendar">
+              {WEEKDAYS.map((label) => <div key={label} className="calendar-head">{label}</div>)}
+              {cells.map((day, index) => (
+                <div key={day ?? `pad-${index}`} className="calendar-day">
+                  {day ? <strong>{Number(day.slice(8))}</strong> : null}
+                  {(day ? byDay.get(day) ?? [] : []).map((task) => <div key={task.id} data-testid="calendar-task">{task.title}</div>)}
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      })}
+      {undated.length ? <p className="muted">Sin fecha: {undated.map((task) => task.title).join(", ")}</p> : null}
+    </section>
   );
 }
 
